@@ -1,0 +1,193 @@
+function safeRead(element, property) {
+  try {
+    return String(element[property]());
+  } catch (_) {
+    return "";
+  }
+}
+
+function standardWindow(process) {
+  const windows = process.windows();
+  for (let index = 0; index < windows.length; index += 1) {
+    if (safeRead(windows[index], "subrole") === "AXStandardWindow") {
+      return windows[index];
+    }
+  }
+  return null;
+}
+
+function desktopProcess(systemEvents) {
+  const processes = systemEvents.processes();
+  for (let index = 0; index < processes.length; index += 1) {
+    if (
+      safeRead(processes[index], "bundleIdentifier") ===
+      "com.anthropic.claudefordesktop"
+    ) {
+      return processes[index];
+    }
+  }
+  return null;
+}
+
+function findElement(window, predicate) {
+  const elements = window.entireContents();
+  for (let index = 0; index < elements.length; index += 1) {
+    if (predicate(elements[index])) return elements[index];
+  }
+  return null;
+}
+
+function findButtonByDescription(window, description) {
+  const elements = window.entireContents();
+  for (let index = 0; index < elements.length; index += 1) {
+    const element = elements[index];
+    if (
+      safeRead(element, "role") === "AXButton" &&
+      safeRead(element, "description") === description
+    ) {
+      return element;
+    }
+  }
+  return null;
+}
+
+function findByRoleAndDescription(window, role, description) {
+  return findElement(
+    window,
+    (element) =>
+      safeRead(element, "role") === role &&
+      safeRead(element, "description") === description,
+  );
+}
+
+function selectManualPermission(window) {
+  const permissionMenu = findElement(
+    window,
+    (element) =>
+      safeRead(element, "role") === "AXPopUpButton" &&
+      ["Manual", "Accept edits", "Plan", "Auto", "Bypass permissions"].includes(
+        safeRead(element, "name"),
+      ),
+  );
+  if (!permissionMenu) {
+    throw new Error("Cannot locate Claude Desktop's permission selector.");
+  }
+
+  press(permissionMenu);
+  const manual = waitFor(
+    () =>
+      findElement(
+        window,
+        (element) =>
+          safeRead(element, "name").startsWith("Manual ") &&
+          safeRead(element, "name").includes("Always ask before making changes"),
+      ),
+    10_000,
+    "Claude Desktop's Manual permission mode",
+  );
+  press(manual);
+}
+
+function press(element) {
+  const actions = element.actions();
+  for (let index = 0; index < actions.length; index += 1) {
+    if (safeRead(actions[index], "name") === "AXPress") {
+      actions[index].perform();
+      return;
+    }
+  }
+  throw new Error("The selected Claude Desktop control cannot be pressed.");
+}
+
+function waitFor(find, timeoutMs, description) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const result = find();
+    if (result) return result;
+    delay(0.5);
+  }
+  throw new Error(`Timed out waiting for ${description}.`);
+}
+
+function run(argv) {
+  const cwd = argv[0];
+  const prompt = argv[1];
+  const timeoutMs = Number(argv[2] || "600000");
+  const projectName = cwd.replace(/\/+$/, "").split("/").pop();
+
+  if (!cwd || !prompt || !projectName) {
+    throw new Error("Usage: claude-desktop.jxa <cwd> <prompt> [timeoutMs]");
+  }
+
+  const systemEvents = Application("System Events");
+  const process = waitFor(
+    () => desktopProcess(systemEvents),
+    Math.min(timeoutMs, 30_000),
+    "Claude Desktop process",
+  );
+  const window = waitFor(
+    () => standardWindow(process),
+    Math.min(timeoutMs, 30_000),
+    "Claude Desktop window",
+  );
+  const newSessionDescription = `New session in ${projectName}`;
+  const newSession = findButtonByDescription(window, newSessionDescription);
+  const projectFormOpen = Boolean(
+    findElement(
+      window,
+      (element) =>
+        safeRead(element, "role") === "AXPopUpButton" &&
+        safeRead(element, "name") === projectName,
+    ),
+  );
+
+  if (!newSession && !projectFormOpen) {
+    const availableProjects = [];
+    const elements = window.entireContents();
+    for (let index = 0; index < elements.length; index += 1) {
+      const description = safeRead(elements[index], "description");
+      if (description.startsWith("New session in ")) {
+        availableProjects.push(description);
+      }
+    }
+    throw new Error(
+      `Project '${projectName}' is not open in Claude Desktop. Open it once, then retry. Available: ${availableProjects.join(", ") || "none"}.`,
+    );
+  }
+
+  if (newSession) press(newSession);
+
+  const promptArea = waitFor(
+    () =>
+      findElement(
+        window,
+        (element) =>
+          safeRead(element, "role") === "AXTextArea" &&
+          safeRead(element, "description") === "Prompt" &&
+          safeRead(element, "value").includes("Describe a task"),
+      ),
+    Math.min(timeoutMs, 30_000),
+    "Claude Desktop's new-session prompt",
+  );
+
+  selectManualPermission(window);
+
+  promptArea.value = prompt;
+  delay(0.5);
+  if (!safeRead(promptArea, "value").includes("DAB_REQUEST_ID:")) {
+    throw new Error("Claude Desktop did not retain the review prompt.");
+  }
+
+  const send = waitFor(
+    () =>
+      {
+        const button = findByRoleAndDescription(window, "AXButton", "Send");
+        return button && safeRead(button, "enabled") === "true" ? button : null;
+      },
+    Math.min(timeoutMs, 30_000),
+    "Claude Desktop's Send button",
+  );
+
+  press(send);
+  return JSON.stringify({ submitted: true, projectName });
+}

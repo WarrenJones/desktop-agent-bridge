@@ -1,0 +1,26 @@
+{
+  "name": "desktop-agent-bridge",
+  "version": "0.1.0",
+  "description": "Local-first handoffs between native Codex Desktop and Claude Desktop sessions.",
+  "type": "module",
+  "bin": {
+    "dab": "./bin/dab.js"
+  },
+  "scripts": {
+    "install:local": "node scripts/install.js",
+    "test": "node --test",
+    "check": "node --check bin/dab.js && node --check src/*.js && node --check scripts/install.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "files": [
+    "bin/",
+    "src/",
+    "scripts/",
+    "integrations/",
+    "README.md",
+    "LICENSE"
+  ]
+}
