@@ -29,26 +29,29 @@ function desktopProcess(systemEvents) {
   return null;
 }
 
-function findElement(window, predicate) {
-  const elements = window.entireContents();
+function findElementIn(elements, predicate) {
   for (let index = 0; index < elements.length; index += 1) {
     if (predicate(elements[index])) return elements[index];
   }
   return null;
 }
 
-function findButtonByDescription(window, description) {
-  const elements = window.entireContents();
-  for (let index = 0; index < elements.length; index += 1) {
-    const element = elements[index];
-    if (
+function findElement(window, predicate) {
+  return findElementIn(window.entireContents(), predicate);
+}
+
+function findButtonByLabelIn(elements, label) {
+  return findElementIn(
+    elements,
+    (element) =>
       safeRead(element, "role") === "AXButton" &&
-      safeRead(element, "description") === description
-    ) {
-      return element;
-    }
-  }
-  return null;
+      (safeRead(element, "name") === label ||
+        safeRead(element, "description") === label),
+  );
+}
+
+function findButtonByLabel(window, label) {
+  return findButtonByLabelIn(window.entireContents(), label);
 }
 
 function findByRoleAndDescription(window, role, description) {
@@ -58,6 +61,36 @@ function findByRoleAndDescription(window, role, description) {
       safeRead(element, "role") === role &&
       safeRead(element, "description") === description,
   );
+}
+
+function isNewSessionPrompt(element) {
+  return (
+    safeRead(element, "role") === "AXTextArea" &&
+    safeRead(element, "description") === "Prompt" &&
+    safeRead(element, "value").includes("Describe a task")
+  );
+}
+
+function findNewSessionPrompt(window) {
+  return findElement(window, isNewSessionPrompt);
+}
+
+function inspectProjectWindow(window, projectName) {
+  const elements = window.entireContents();
+  const newSessionLabel = `New session in ${projectName}`;
+  const newSession = findButtonByLabelIn(elements, newSessionLabel);
+  const projectSelector = findElementIn(
+    elements,
+    (element) =>
+      safeRead(element, "role") === "AXPopUpButton" &&
+      safeRead(element, "name") === projectName,
+  );
+  const prompt = findElementIn(elements, isNewSessionPrompt);
+  return { newSession, projectFormOpen: Boolean(projectSelector && prompt) };
+}
+
+function isProjectFormOpen(window, projectName) {
+  return inspectProjectWindow(window, projectName).projectFormOpen;
 }
 
 function selectManualPermission(window) {
@@ -130,16 +163,9 @@ function run(argv) {
     Math.min(timeoutMs, 30_000),
     "Claude Desktop window",
   );
-  const newSessionDescription = `New session in ${projectName}`;
-  const newSession = findButtonByDescription(window, newSessionDescription);
-  const projectFormOpen = Boolean(
-    findElement(
-      window,
-      (element) =>
-        safeRead(element, "role") === "AXPopUpButton" &&
-        safeRead(element, "name") === projectName,
-    ),
-  );
+  const projectState = inspectProjectWindow(window, projectName);
+  const newSession = projectState.newSession;
+  const projectFormOpen = projectState.projectFormOpen;
 
   if (!newSession && !projectFormOpen) {
     const availableProjects = [];
@@ -158,14 +184,7 @@ function run(argv) {
   if (newSession) press(newSession);
 
   const promptArea = waitFor(
-    () =>
-      findElement(
-        window,
-        (element) =>
-          safeRead(element, "role") === "AXTextArea" &&
-          safeRead(element, "description") === "Prompt" &&
-          safeRead(element, "value").includes("Describe a task"),
-      ),
+    () => findNewSessionPrompt(window),
     Math.min(timeoutMs, 30_000),
     "Claude Desktop's new-session prompt",
   );
