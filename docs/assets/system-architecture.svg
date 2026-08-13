@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="820" viewBox="0 0 1400 820" role="img" aria-labelledby="title desc">
+  <title id="title">desktop-agent-bridge system architecture</title>
+  <desc id="desc">An adapter-based local bridge between native Codex Desktop and Claude Desktop sessions.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#475569"/>
+    </marker>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#2563eb"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#059669"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+    <style>
+      .title { font: 700 28px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 15px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #64748b; }
+      .group { font: 700 16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #334155; letter-spacing: .7px; }
+      .boxTitle { font: 700 16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #0f172a; }
+      .boxText { font: 400 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #475569; }
+      .small { font: 500 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #64748b; }
+      .arrowLabel { font: 600 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #334155; }
+    </style>
+  </defs>
+
+  <rect width="1400" height="820" fill="#f8fafc"/>
+  <text x="60" y="52" class="title">Native Desktop handoff, adapter by adapter</text>
+  <text x="60" y="78" class="subtitle">No bridge daemon, shared database, API key, or vendor-neutral session protocol is introduced in v0.1.0.</text>
+
+  <rect x="45" y="110" width="290" height="570" rx="22" fill="#eef2ff" stroke="#c7d2fe" stroke-width="2"/>
+  <text x="70" y="143" class="group">SOURCE DESKTOP</text>
+
+  <rect x="70" y="170" width="240" height="92" rx="14" fill="#ffffff" stroke="#a5b4fc" filter="url(#shadow)"/>
+  <circle cx="96" cy="198" r="11" fill="#4f46e5"/>
+  <text x="116" y="203" class="boxTitle">Codex Desktop</text>
+  <text x="92" y="231" class="boxText">$peer-review skill</text>
+  <text x="92" y="250" class="small">Codex → Claude request</text>
+
+  <rect x="70" y="286" width="240" height="92" rx="14" fill="#ffffff" stroke="#a5b4fc" filter="url(#shadow)"/>
+  <circle cx="96" cy="314" r="11" fill="#d97706"/>
+  <text x="116" y="319" class="boxTitle">Claude Desktop</text>
+  <text x="92" y="347" class="boxText">/peer-review skill</text>
+  <text x="92" y="366" class="small">Claude → Codex request</text>
+
+  <rect x="70" y="414" width="240" height="160" rx="14" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="92" y="445" class="boxTitle">Bounded handoff context</text>
+  <text x="92" y="474" class="boxText">• review request</text>
+  <text x="92" y="497" class="boxText">• decisions and constraints</text>
+  <text x="92" y="520" class="boxText">• unresolved questions</text>
+  <text x="92" y="550" class="small">Repository content is not copied.</text>
+
+  <rect x="382" y="110" width="550" height="570" rx="22" fill="#ecfeff" stroke="#a5f3fc" stroke-width="2"/>
+  <text x="407" y="143" class="group">DESKTOP-AGENT-BRIDGE (LOCAL NODE.JS PROCESS)</text>
+
+  <rect x="407" y="170" width="500" height="78" rx="14" fill="#ffffff" stroke="#67e8f9" filter="url(#shadow)"/>
+  <text x="432" y="200" class="boxTitle">CLI boundary · src/cli.js</text>
+  <text x="432" y="225" class="boxText">Parse cwd, request, context, target, timeout; select one runner.</text>
+
+  <rect x="407" y="270" width="500" height="92" rx="14" fill="#ffffff" stroke="#67e8f9"/>
+  <text x="432" y="300" class="boxTitle">Review envelope · src/core.js</text>
+  <text x="432" y="325" class="boxText">Random boundary + request ID · untrusted source data · read-only policy</text>
+  <text x="432" y="347" class="small">The repository remains the reviewer's source of truth.</text>
+
+  <rect x="407" y="388" width="236" height="208" rx="14" fill="#eff6ff" stroke="#93c5fd"/>
+  <text x="430" y="418" class="boxTitle">Claude target adapter</text>
+  <text x="430" y="445" class="boxText">1. JXA Accessibility driver</text>
+  <text x="430" y="468" class="boxText">2. New native Code session</text>
+  <text x="430" y="491" class="boxText">3. Manual permission mode</text>
+  <text x="430" y="514" class="boxText">4. Poll local JSONL transcript</text>
+  <text x="430" y="537" class="boxText">5. Match cwd + request + session</text>
+  <text x="430" y="566" class="small">UI compatibility boundary</text>
+
+  <rect x="671" y="388" width="236" height="208" rx="14" fill="#ecfdf5" stroke="#6ee7b7"/>
+  <text x="694" y="418" class="boxTitle">Codex target adapter</text>
+  <text x="694" y="445" class="boxText">1. Desktop-bundled runtime</text>
+  <text x="694" y="468" class="boxText">2. codex exec --json</text>
+  <text x="694" y="491" class="boxText">3. read-only sandbox</text>
+  <text x="694" y="514" class="boxText">4. Parse thread + final message</text>
+  <text x="694" y="537" class="boxText">5. Open codex:// deep link</text>
+  <text x="694" y="566" class="small">Runtime and deep-link boundary</text>
+
+  <rect x="970" y="110" width="385" height="570" rx="22" fill="#fefce8" stroke="#fde68a" stroke-width="2"/>
+  <text x="995" y="143" class="group">TARGET NATIVE SESSION</text>
+
+  <rect x="995" y="170" width="335" height="142" rx="14" fill="#ffffff" stroke="#fcd34d" filter="url(#shadow)"/>
+  <text x="1020" y="201" class="boxTitle">Claude Desktop Code</text>
+  <text x="1020" y="228" class="boxText">New visible session in target project</text>
+  <text x="1020" y="251" class="boxText">Reads the same working tree directly</text>
+  <text x="1020" y="274" class="boxText">Persists transcript under ~/.claude</text>
+  <rect x="1020" y="286" width="138" height="18" rx="9" fill="#fef3c7"/>
+  <text x="1031" y="299" class="small">Manual · soft guard</text>
+
+  <rect x="995" y="342" width="335" height="142" rx="14" fill="#ffffff" stroke="#fcd34d" filter="url(#shadow)"/>
+  <text x="1020" y="373" class="boxTitle">Codex Desktop task</text>
+  <text x="1020" y="400" class="boxText">Persistent thread created by runtime</text>
+  <text x="1020" y="423" class="boxText">Reads the same working tree directly</text>
+  <text x="1020" y="446" class="boxText">Opened through codex://threads/&lt;id&gt;</text>
+  <rect x="1020" y="458" width="178" height="18" rx="9" fill="#dbeafe"/>
+  <text x="1031" y="471" class="small">read-only sandbox · hard guard</text>
+
+  <rect x="995" y="514" width="335" height="96" rx="14" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="1020" y="545" class="boxTitle">Normalized result</text>
+  <text x="1020" y="572" class="boxText">{ target, sessionId, result, handoffError? }</text>
+  <text x="1020" y="593" class="small">Returned to the originating conversation.</text>
+
+  <path d="M310 218 C350 218, 360 208, 407 208" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <path d="M310 334 C350 334, 360 220, 407 220" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="330" y="188" class="arrowLabel">dab review</text>
+
+  <path d="M643 493 C780 493, 835 241, 995 241" fill="none" stroke="#2563eb" stroke-width="3" marker-end="url(#arrowBlue)"/>
+  <path d="M907 493 C950 493, 950 413, 995 413" fill="none" stroke="#059669" stroke-width="3" marker-end="url(#arrowGreen)"/>
+
+  <path d="M1160 610 C1160 730, 315 730, 315 564" fill="none" stroke="#475569" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#arrow)"/>
+  <text x="665" y="754" class="arrowLabel">exact final review + destination session ID</text>
+
+  <rect x="382" y="706" width="550" height="72" rx="14" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="407" y="735" class="boxTitle">Shared working tree</text>
+  <text x="407" y="760" class="boxText">Both agents inspect the same cwd; only non-repository conversational context crosses the bridge.</text>
+</svg>

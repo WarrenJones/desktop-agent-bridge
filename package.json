@@ -43,6 +43,7 @@
     "src/",
     "scripts/",
     "integrations/",
+    "docs/",
     "README.md",
     "LICENSE"
   ]

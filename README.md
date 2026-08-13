@@ -4,6 +4,8 @@ Local-first, native Desktop handoffs between Codex and Claude.
 
 The MVP supports one workflow in both directions: create an independent read-only code review in the other coding agent, keep that review as a native Desktop session/thread, and return the final review to the source conversation.
 
+For component boundaries, bidirectional lifecycle diagrams, trust guarantees, failure semantics, and adapter maintenance guidance, see the [core architecture](docs/architecture.md).
+
 ## What works today
 
 ### Codex Desktop → Claude Desktop
