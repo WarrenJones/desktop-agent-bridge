@@ -1,13 +1,15 @@
 {
   "name": "desktop-agent-bridge",
   "version": "0.2.2",
-  "description": "Local-first handoffs between native Codex Desktop and Claude Desktop sessions.",
+  "description": "Ask Claude Desktop to review a Codex Desktop task with source context and returned findings.",
   "keywords": [
     "codex",
     "claude",
     "desktop",
     "code-review",
-    "coding-agent"
+    "coding-agent",
+    "peer-review",
+    "context-handoff"
   ],
   "homepage": "https://github.com/WarrenJones/desktop-agent-bridge#readme",
   "bugs": {

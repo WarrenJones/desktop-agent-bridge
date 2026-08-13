@@ -1,13 +1,13 @@
 # 为什么要做 Desktop Agent Bridge
 
-状态：截至 2026-08-13 的市场调研与产品边界记录
+状态：截至 2026-08-13 的市场调研与产品边界记录；已修正 Claude Desktop 与 Claude Code Plugin 的关系
 目的：解释为什么现有产品没有完整满足本项目的目标，以及 DAB 应如何处理 Context 和可插拔 Skill
 
 本文只把官方文档和公开源码能证明的内容写成“调研事实”。由这些事实推导出的产品选择，会明确标记为“DAB 结论”，避免把我们的设计建议说成行业现状。
 
 ## 1. 我们真正要解决的问题
 
-目标不是泛化的“多个 Agent 可以互相发消息”，而是同时满足下面五点：
+目标不是泛化的“多个 Agent 可以互相发消息”。DAB 实现的是下面五点组成的双向体验，但市场缺口必须按方向判断：
 
 1. 源头是用户正在使用的原生 Codex Desktop 或原生 Claude Desktop 会话；
 2. 目标 Agent 在同一个本地项目下创建一个新的、用户可见的原生 Desktop 会话；
@@ -15,7 +15,7 @@
 4. 目标 Agent 独立完成 code review 等动作；
 5. 目标 Agent 的最终结论自动返回源会话，用户不需要在窗口之间复制粘贴。
 
-这五点缺一不可。CLI 之间能通信、在 VS Code 里统一托管多个 Agent、或者把一段消息送到另一个终端，都只能解决其中一部分。
+这五点缺一不可。需要特别说明：Claude Desktop 的 Code 标签运行 Claude Code，并支持安装 Claude Code Plugin。因此，OpenAI 官方 `codex-plugin-cc` 已经覆盖了大部分 **Claude Desktop / Claude Code → Codex** 场景。DAB 不能把整个双向体验都描述成市场空白；其明确新增方向是 **Codex Desktop → Claude Desktop**。
 
 ![市场能力、Context 与扩展形态概览](assets/research-context-and-extension.svg)
 
@@ -25,7 +25,7 @@
 
 | 产品 | 实际运行表面 | Context 的实际处理 | 能否满足原生 Desktop 双向闭环 |
 | --- | --- | --- | --- |
-| OpenAI `codex-plugin-cc` | Claude Code → 本地 Codex runtime / Codex 持久线程 | review 读取 Git 状态；rescue 转发任务文本；transfer 以 Claude transcript JSONL 为输入导入 Codex 线程 | 不能。它非常接近 Claude Code → Codex，但源头不是 Claude Desktop，也没有 Codex Desktop → Claude Desktop 的对称路径 |
+| OpenAI `codex-plugin-cc` | Claude Code（包括 Claude Desktop Code 标签）→ 本地 Codex runtime / Codex 持久线程 | review 读取 Git 状态；rescue 转发任务文本；transfer 以 Claude transcript JSONL 为输入导入 Codex 线程 | 部分满足。它已覆盖 Claude Desktop / Claude Code → Codex，但没有 Codex Desktop → Claude Desktop |
 | `agent-bridge` | Claude Code ↔ Codex CLI/TUI 持久 peer | daemon 维护连接；Claude 侧经 MCP、Codex 侧经 app-server 交换消息并保持 peer 关系 | 不能。它已经解决真正双向的 Agent bridge，但运行表面是 CLI/TUI，不是两个原生 Desktop 应用 |
 | `hcom` | 被 `hcom` 启动或接管的多个 CLI Agent | 消息经 hooks 和本地 SQLite 投递；Agent 可查询 inbox、结构化 transcript、文件编辑和事件日志 | 不能。解决的是终端 Agent 通信与编排，不创建两个厂商的原生 Desktop 会话 |
 | `agentchattr` | CLI wrapper + 本地聊天服务 + MCP | 被 @ 的 Agent 读取频道近期消息；job 会携带标题、状态和该 job 的会话历史 | 不能。Context 来自共享聊天室或 job，不是源 Desktop 的私有会话上下文 |
@@ -36,14 +36,15 @@
 
 #### `codex-plugin-cc`
 
-这是最接近 DAB 的对照产品，也最能说明“Context”不能被笼统理解成一种东西：
+这是与 DAB 重叠最大的对照产品，也最能说明“Context”不能被笼统理解成一种东西：
 
 - [`/codex:review`](https://github.com/openai/codex-plugin-cc/blob/main/plugins/codex/commands/review.md) 的输入是本地 Git 状态；它执行 Codex review，不会把 Claude 对话历史自动作为 review 输入。
 - [`codex-rescue` agent](https://github.com/openai/codex-plugin-cc/blob/main/plugins/codex/agents/codex-rescue.md) 被要求保留用户任务文本，仅做必要的 prompt tightening，然后把任务交给 Codex runtime。这是“显式任务文本 + 共享代码目录”。
 - [`/codex:transfer`](https://github.com/openai/codex-plugin-cc/blob/main/plugins/codex/commands/transfer.md) 是另一类能力：SessionStart hook 提供当前 Claude transcript 路径，Codex external-agent importer 转换该 JSONL，并创建可在 Codex App 或 TUI 中继续的持久线程。这里不是简单摘要，而是“会话记录导入”，但会遵循 importer 的转换规则。
-- [README](https://github.com/openai/codex-plugin-cc#codex-plugin-for-claude-code) 明确把使用面定义为 Claude Code 内调用 Codex。它证明单向 handoff 和 transcript import 已经存在，但没有证明原生 Claude Desktop ↔ 原生 Codex Desktop 的双向闭环已经存在。
+- [README](https://github.com/openai/codex-plugin-cc#codex-plugin-for-claude-code) 明确把使用面定义为 Claude Code 内调用 Codex。
+- [Claude Desktop 官方文档](https://code.claude.com/docs/en/desktop) 明确说明 Desktop 的 Code 标签运行同一个 Claude Code 引擎，并且本地 session 支持安装 Plugin。因此，不能再以“它是 Claude Code Plugin”为由排除 Claude Desktop；`codex-plugin-cc` 的这些能力可以在 Claude Desktop Code session 中使用。
 
-因此，我们不能再把市场缺口描述成“没有任何 Claude → Codex handoff”。准确说法是：**已有 Claude Code → Codex 的委派和会话导入；在本次调研的一手资料中，还没有发现同时满足五项条件的原生 Desktop 双向产品。**
+因此，准确说法是：**Claude Desktop / Claude Code → Codex 的 review、委派、结果查询和会话导入已经由官方插件覆盖；DAB 真正新增的是 Codex Desktop → Claude Desktop，并把反向能力包装进同一个双向 workflow。** 如果用户只需要 Claude → Codex，应优先使用官方插件，而不是安装 DAB。
 
 #### `hcom`
 
@@ -172,9 +173,16 @@ Skill 不应该直接操作 Claude/Codex 的 UI、transcript 或 deep link；这
 - CLI Agent 的消息、委派和 transcript import 已经有人解决；
 - 单一宿主内的多 session 管理已经有人解决；
 - Agent Skills 的打包和跨宿主安装正在趋于标准化；
-- **没有发现一个产品同时完成原生 Codex Desktop ↔ 原生 Claude Desktop、新建可见 session、同项目 review、必要 Context 传递和结果自动返回。**
+- **OpenAI 官方插件已覆盖 Claude Desktop / Claude Code → Codex；本次一手资料中没有发现它或其他代表性产品覆盖 Codex Desktop → Claude Desktop 的同等闭环。**
 
-DAB 的价值不是重新实现聊天、MCP、Skill marketplace 或知识库，而是补上最后这个原生 Desktop session bridge。
+DAB 的价值不是重新实现聊天、MCP、Skill marketplace 或知识库，而是补上 **Codex Desktop → Claude Desktop**，并为确实需要双向使用的用户提供一致入口。反向实现属于产品完整性，不是独占能力。
+
+### 什么时候不应该使用 DAB
+
+- 只需要从 Claude Desktop 或 Claude Code 调用 Codex：优先使用官方 `codex-plugin-cc`；
+- 可以接受两个 Agent 都运行在 CLI/TUI：优先评估 `agent-bridge`、`hcom` 等终端方案；
+- 所有 session 都愿意放进 VS Code：优先使用宿主原生的 Agent Sessions；
+- 不要求目标 session 在第一方 Desktop UI 中可见：没有必要承担 DAB 的 Accessibility 兼容成本。
 
 ### 我们不做什么
 

@@ -4,18 +4,20 @@
 [![macOS](https://img.shields.io/badge/platform-macOS-black.svg)](#安装与使用)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**让当前原生 Desktop 会话里的 Agent 带着会话 Context 去调用另一个原生 Desktop Agent，并把结果自动带回来。**
+**从 Codex Desktop 当前对话出发，让 Claude Desktop 带着源会话 Context 独立 review，再把结论自动返回 Codex。**
 
 [English](README.md) · [核心架构](docs/architecture.md) · [调研与产品结论](docs/research-and-rationale.md) · [Skill 开发指南](docs/skill-packages.md)
 
-```bash
-npm install -g desktop-agent-bridge
-dab install
+```text
+Codex Desktop → 新建 Claude Desktop review session → 结论返回 Codex
 ```
 
-## 1. 它是什么
+> [!IMPORTANT]
+> [Claude Desktop 的 Code 标签](https://code.claude.com/docs/en/desktop)运行 Claude Code，并支持安装 Plugin。OpenAI 官方 [`codex-plugin-cc`](https://github.com/openai/codex-plugin-cc) 已经覆盖了大部分 **Claude Desktop / Claude Code → Codex** 场景，包括 review、委派、结果查询和 transcript transfer。如果你只需要这个方向，直接使用官方插件。DAB 真正补充的是相反方向——**Codex Desktop → Claude Desktop**——以及从任一应用发起时一致的 workflow。
 
-Desktop Agent Bridge（DAB）双向连接 **Codex Desktop 与 Claude Desktop**。源 Agent 继续留在用户正在工作的对话中；DAB 传递任务和必要的源会话历史，在另一个原生 Desktop 应用里创建一条新的、用户可见的 session，等待它完成，再把结果返回源 Agent。
+## 1. 它能做什么
+
+Desktop Agent Bridge（DAB）双向连接 **Codex Desktop 与 Claude Desktop**。源 Agent 留在工作发生的当前对话中；DAB 把 review 任务和必要的源会话历史交给另一个应用里的新可见 session，等待 reviewer 完成，再把结果返回源对话。
 
 ```text
 当前 Desktop 对话
@@ -26,36 +28,35 @@ Desktop Agent Bridge ──► 新的原生 Desktop review session
        └──────── 最终结论 ───────────┘
 ```
 
-比如相互 review：
+安装内置的第一个 workflow `peer-review`：
+
+```bash
+npm install -g desktop-agent-bridge
+dab install
+```
+
+然后就可以相互 review：
 
 - 在 Codex Desktop 中让 Claude Desktop 帮忙 review：`$peer-review Ask Claude to review the current changes.`
 - 在 Claude Desktop 中让 Codex Desktop 帮忙 review：`/peer-review Ask Codex to review the current changes.`
 - 两个方向的 reviewer 都检查同一份当前工作树且不修改代码；Codex 使用只读 sandbox，Claude 使用 Manual 审批模式。
 - 底层 handoff 引擎与 review 方法解耦，第三方 Skill 可以基于它实现安全审查、架构挑战、测试方案 review 等 workflow。
 
-### 一次真实 handoff 到底是什么样
+### Codex → Claude 的完整闭环：四张真实截图
 
-下面的截图来自公开 [`demo-review-project`](examples/demo-review-project) 中真实跑通的两条 handoff。两个例子里，关键产品决策都**只存在于 Agent A 的对话中**，仓库里没有，发给 Agent B 的请求里也没有。所有图片都只保留 demo 内容区，排除了私人侧栏、其他任务、账号信息、通知和本地路径。
+下面的截图来自公开 [`demo-review-project`](examples/demo-review-project) 中真实跑通的一次 handoff。关键产品决策**只存在于源 Codex 对话中**，仓库里没有，发给 Claude 的请求里也没有。
 
-#### Codex Desktop → Claude Desktop → Codex Desktop
+| 1. Codex 当前对话掌握产品决策 | 2. 在同一 task 调用 `peer-review` |
+| --- | --- |
+| ![Codex 对话中保存着实现 Context](docs/assets/walkthrough/codex-source-context.jpg) | ![Codex 调用 Peer Review Skill](docs/assets/walkthrough/codex-invokes-peer-review.jpg) |
+| **3. DAB 新建 Claude Desktop review session** | **4. Claude 的结论返回原 Codex task** |
+| ![新建的 Claude Desktop review session](docs/assets/walkthrough/claude-review-session.jpg) | ![Claude review 结论返回 Codex](docs/assets/walkthrough/claude-result-in-codex.jpg) |
 
-1. **Agent A 已经完成工作，并在当前对话里掌握产品决策。** Codex 知道“会员积分可以抵扣商品小计，但不能抵扣运费”；这条规则故意没有写进仓库。
+Claude 读取转交的源会话 Context 和当前工作树，发现 `checkoutTotal` 错误地让超额会员积分抵扣运费，再把结论自动返回 Codex。用户不需要在两个窗口之间复制粘贴。
 
-   ![Codex 对话中保存着实现 Context](docs/assets/walkthrough/codex-source-context.jpg)
+### 反向能力用于保持一致体验
 
-2. **用户直接在同一条 Codex 对话里调用 `peer-review`。** 请求只让 Claude 按前面的决策 review，没有把预期缺陷透露给 Claude。
-
-   ![Codex 调用 Peer Review Skill](docs/assets/walkthrough/codex-invokes-peer-review.jpg)
-
-3. **DAB 在同一个项目下新建原生 Claude Desktop session。** Claude 读取转交的源会话 Context 和当前工作树，发现 `checkoutTotal` 会让超额积分抵扣运费。
-
-   ![新建的 Claude Desktop review session](docs/assets/walkthrough/claude-review-session.jpg)
-
-4. **Claude 的结论自动回到原来的 Codex task。** 用户不需要在两个窗口之间复制粘贴。
-
-   ![Claude review 结论返回 Codex](docs/assets/walkthrough/claude-result-in-codex.jpg)
-
-#### Claude Desktop → Codex Desktop → Claude Desktop
+这个方向与 `codex-plugin-cc` 有明显重叠，DAB 不再把它描述成无人解决的市场空白。DAB 保留它，是为了让同一个 `peer-review` workflow 能从任一 Desktop 应用发起。
 
 1. **Agent A 掌握决策并调用 `peer-review`。** Claude 知道“到达 `expiresAt` 的精确时刻就算过期”，随后让 Codex review `src/token.js`，但 review 请求本身没有写这条规则。
 
@@ -69,27 +70,27 @@ Desktop Agent Bridge ──► 新的原生 Desktop review session
 
    ![Codex review 结论返回 Claude](docs/assets/walkthrough/codex-result-in-claude.jpg)
 
-## 2. 为什么需要它
+## 2. 它适合谁，又不适合谁
 
-Agent 之间的调用早已存在，但我们调研的代表性产品解决的是不同边界：
+Agent 之间的调用早已存在，关键是按方向比较：
 
-| 项目 | Agent 运行在哪里 | Context / 协作方式 | 原生 Codex Desktop ↔ Claude Desktop？ |
-| --- | --- | --- | --- |
-| [OpenAI `codex-plugin-cc`](https://github.com/openai/codex-plugin-cc) | Claude Code → Codex runtime / 持久 Codex thread | Git review、显式委派，以及 transfer 时的 Claude transcript 导入 | 不能。源头是 Claude Code，而且不是对称双向。 |
-| [`agent-bridge`](https://github.com/raysonmeng/agent-bridge) | Claude Code 与 Codex CLI/TUI | 通过 daemon、MCP 和 app-server 建立持久的双向 peer | 不能。它的 peer 是终端 Agent。 |
-| [`hcom`](https://github.com/aannoo/hcom) | 在终端中启动或接管多个 CLI Agent | hooks、消息、transcript、事件和本地 SQLite | 不能。它协调的是终端 Agent。 |
-| [VS Code Agent Sessions](https://code.visualstudio.com/docs/agents/run/sessions/manage-sessions) | 由同一个 VS Code host 管理多个 session | host 可以 fork 历史、读取近期 Context、向其他 session 发消息 | 不能。双方必须都在 VS Code 这个共同宿主内。 |
-| **Desktop Agent Bridge** | **原生 Codex Desktop 与原生 Claude Desktop** | **源 transcript + 实时工作树 → 可见目标 session → 结果返回** | **能。这就是它刻意保持狭窄的目标。** |
+| 项目 | 已经解决什么 | 什么时候还需要 DAB |
+| --- | --- | --- |
+| [OpenAI `codex-plugin-cc`](https://github.com/openai/codex-plugin-cc) | Claude Desktop / Claude Code → Codex 的 review 与委派；transfer 可创建持久 Codex thread | **如果只需要这个方向，应直接用官方插件。** 它不提供 Codex Desktop → Claude Desktop。 |
+| [`agent-bridge`](https://github.com/raysonmeng/agent-bridge) | 通过 daemon、MCP 和 app-server 建立 Claude Code ↔ Codex CLI/TUI 的持久双向 peer | 只有当目标必须出现在两个第一方 Desktop 应用的可见 session 中时，才需要 DAB。 |
+| [`hcom`](https://github.com/aannoo/hcom) | 为终端 Agent 提供 hooks、消息、transcript、事件和本地 SQLite | 只有这个更窄的原生 Desktop handoff 场景才需要 DAB。 |
+| [VS Code Agent Sessions](https://code.visualstudio.com/docs/agents/run/sessions/manage-sessions) | 在同一个 VS Code host 内创建 session、读取历史和发送消息 | 只有两个 session 必须留在不同的第一方 Desktop 应用时，才需要 DAB。 |
+| **Desktop Agent Bridge** | **Codex Desktop → Claude Desktop，并为反方向提供统一封装** | **源 transcript + 实时工作树 → 可见目标 session → 结果返回。** |
 
-真正的缺口不是“Agent 不能说话”，而是下面这个完整场景：
+DAB 瞄准的未覆盖方向是：
 
-1. 用户继续使用习惯的第一方 Desktop 应用；
-2. 随时让另一个厂商的 Desktop Agent 提供独立意见；
-3. 对方能知道源对话里已经形成、但未必写进代码的决策；
-4. 新目标 session 对用户可见、可继续；
-5. 结论自动返回，不需要在两个窗口之间复制粘贴。
+1. 用户继续留在 Codex Desktop 当前 task；
+2. 直接让 Claude Desktop 提供独立意见；
+3. Claude 能知道 Codex 对话里已经形成、但未必写进代码的决策；
+4. 新 Claude session 对用户可见、可继续；
+5. 结论自动返回 Codex，不需要在两个窗口之间复制粘贴。
 
-DAB 不替代两个 Agent 的原生 UI，不造共享聊天室，也不做通用多 Agent 调度器。它只补上原生 Desktop session 之间的互操作层。完整证据与更严格的产品结论见[调研与产品结论](docs/research-and-rationale.md)。
+DAB 不替代两个 Agent 的原生 UI，不造共享聊天室，也不做通用多 Agent 调度器。它只补上这个原生 Desktop session 互操作方向，并为反方向提供一致入口。修正后的证据与产品结论见[调研与产品结论](docs/research-and-rationale.md)。
 
 ## 3. Context 如何在 Agent 之间传递
 
