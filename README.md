@@ -24,7 +24,27 @@ If the deep link cannot be opened, the completed review is still returned and th
 - Codex Desktop / ChatGPT app
 - macOS Accessibility permission for the terminal or host app that runs `dab`
 
-## Install from source
+## Install
+
+Install the public npm package globally, then install the two Desktop skills:
+
+```bash
+npm install -g desktop-agent-bridge
+dab install
+```
+
+Restart Codex Desktop and Claude Desktop after `dab install` completes.
+
+To upgrade:
+
+```bash
+npm install -g desktop-agent-bridge@latest
+dab install
+```
+
+### Install from source
+
+For contributors and local development:
 
 ```bash
 git clone https://github.com/WarrenJones/desktop-agent-bridge.git
@@ -38,11 +58,27 @@ This installs:
 - `~/.agents/skills/peer-review/SKILL.md` for Codex
 - `~/.claude/skills/peer-review/SKILL.md` for Claude
 
-Install the Claude plugin from `integrations/claude-plugin` through Claude Desktop's plugin UI or load it during development with:
+The install command places the `peer-review` skill in both user-level skill directories. The complete Claude plugin can also be loaded during plugin development with:
 
 ```bash
 claude --plugin-dir ./integrations/claude-plugin
 ```
+
+## Use from Desktop
+
+From a Codex Desktop project task:
+
+```text
+$peer-review Ask Claude to review the current changes for correctness and regressions.
+```
+
+From a Claude Desktop Code session:
+
+```text
+/peer-review Ask Codex to review the current changes against the intended design.
+```
+
+Natural-language requests such as “ask Claude/Codex to independently review the current changes” also activate the installed skill when the Desktop agent recognizes it.
 
 ## CLI
 

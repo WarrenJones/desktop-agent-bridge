@@ -2,19 +2,42 @@
   "name": "desktop-agent-bridge",
   "version": "0.1.0",
   "description": "Local-first handoffs between native Codex Desktop and Claude Desktop sessions.",
+  "keywords": [
+    "codex",
+    "claude",
+    "desktop",
+    "code-review",
+    "coding-agent"
+  ],
+  "homepage": "https://github.com/WarrenJones/desktop-agent-bridge#readme",
+  "bugs": {
+    "url": "https://github.com/WarrenJones/desktop-agent-bridge/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WarrenJones/desktop-agent-bridge.git"
+  },
+  "author": "WarrenJones",
   "type": "module",
   "bin": {
-    "dab": "./bin/dab.js"
+    "dab": "bin/dab.js"
   },
   "scripts": {
     "install:local": "node scripts/install.js",
     "test": "node --test",
-    "check": "node --check bin/dab.js && node --check src/*.js && node --check scripts/install.js"
+    "check": "node --check bin/dab.js && node --check src/*.js && node --check scripts/install.js",
+    "prepublishOnly": "npm test && npm run check"
   },
   "engines": {
     "node": ">=20"
   },
   "license": "MIT",
+  "os": [
+    "darwin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "bin/",
     "src/",

@@ -4,7 +4,10 @@ import { lstat, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { installLinks } from "../src/installer.js";
+import {
+  installLinks,
+  skillLinkSpecifications,
+} from "../src/installer.js";
 
 async function withTemporaryDirectory(run) {
   const directory = await mkdtemp(join(tmpdir(), "dab-installer-"));
@@ -61,4 +64,26 @@ test("installLinks is idempotent for links already owned by the project", async 
 
     assert.equal((await lstat(target)).isSymbolicLink(), true);
   });
+});
+
+test("skillLinkSpecifications targets both Desktop skill directories", () => {
+  assert.deepEqual(
+    skillLinkSpecifications({
+      projectRoot: "/package",
+      homeDirectory: "/home/user",
+    }),
+    [
+      {
+        source: "/package/integrations/codex-skill/peer-review",
+        target: "/home/user/.agents/skills/peer-review",
+        type: "dir",
+      },
+      {
+        source:
+          "/package/integrations/claude-plugin/skills/peer-review",
+        target: "/home/user/.claude/skills/peer-review",
+        type: "dir",
+      },
+    ],
+  );
 });

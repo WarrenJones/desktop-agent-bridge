@@ -1,9 +1,15 @@
 import { runClaudeReview, runCodexReview } from "./runners.js";
-import { resolve } from "node:path";
+import { installSkills } from "./installer.js";
+import { homedir } from "node:os";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const PROJECT_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
 const HELP = `desktop-agent-bridge
 
 Usage:
+  dab install
   dab review --to <claude|codex> --request <text> [options]
 
 Options:
@@ -16,6 +22,10 @@ Options:
 
 export function parseCliArgs(args, defaultCwd = process.cwd()) {
   const command = args[0];
+  if (command === "install") {
+    if (args.length > 1) throw new Error(`Unknown option: ${args[1]}`);
+    return { command };
+  }
   if (command !== "review") {
     throw new Error(command ? `Unknown command: ${command}` : "A command is required.");
   }
@@ -64,6 +74,11 @@ export function parseCliArgs(args, defaultCwd = process.cwd()) {
 export async function main(
   args = process.argv.slice(2),
   io = { stdout: process.stdout, stderr: process.stderr },
+  dependencies = {
+    installSkills,
+    projectRoot: PROJECT_ROOT,
+    homeDirectory: homedir(),
+  },
 ) {
   if (args.includes("--help") || args.includes("-h")) {
     io.stdout.write(HELP);
@@ -73,6 +88,17 @@ export async function main(
   let options;
   try {
     options = parseCliArgs(args);
+    if (options.command === "install") {
+      const specifications = await dependencies.installSkills({
+        projectRoot: dependencies.projectRoot,
+        homeDirectory: dependencies.homeDirectory,
+      });
+      for (const { target } of specifications) {
+        io.stdout.write(`Installed skill at ${target}\n`);
+      }
+      io.stdout.write("Restart Codex Desktop and Claude Desktop to load the skills.\n");
+      return 0;
+    }
     io.stderr.write(`Starting native ${options.to} review...\n`);
     const result =
       options.to === "claude"

@@ -1,5 +1,31 @@
 import { lstat, mkdir, readlink, symlink, unlink } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
+
+export function skillLinkSpecifications({ projectRoot, homeDirectory }) {
+  return [
+    {
+      source: join(
+        projectRoot,
+        "integrations",
+        "codex-skill",
+        "peer-review",
+      ),
+      target: join(homeDirectory, ".agents", "skills", "peer-review"),
+      type: "dir",
+    },
+    {
+      source: join(
+        projectRoot,
+        "integrations",
+        "claude-plugin",
+        "skills",
+        "peer-review",
+      ),
+      target: join(homeDirectory, ".claude", "skills", "peer-review"),
+      type: "dir",
+    },
+  ];
+}
 
 async function preflightLink({ source, target }) {
   await lstat(source);
@@ -39,4 +65,10 @@ export async function installLinks(specifications) {
     await Promise.allSettled(created.map((target) => unlink(target)));
     throw error;
   }
+}
+
+export async function installSkills(options) {
+  const specifications = skillLinkSpecifications(options);
+  await installLinks(specifications);
+  return specifications;
 }
