@@ -1,6 +1,6 @@
-# Reproducing the public demos
+# Reproducing the public walkthrough screenshots
 
-The recordings use `examples/demo-review-project`, which contains no private
+The screenshots use `examples/demo-review-project`, which contains no private
 source, credentials, account data, or company paths. Both fixtures have passing
 tests and one intentionally omitted boundary case.
 
@@ -38,7 +38,7 @@ Then invoke:
 Expected independent finding: `now > expiresAt` treats equality as active and
 must be `now >= expiresAt`.
 
-## Recording rules
+## Screenshot rules
 
 - Collapse Claude's sidebar before capture. For Codex, extract a fixed content
   rectangle before encoding any public media; never commit a full-window capture
@@ -47,5 +47,7 @@ must be `now >= expiresAt`.
 - Do not show shell history, vendor transcript directories, account menus, or
   unrelated sidebars, notifications, browser windows, absolute paths, or
   existing task titles.
-- Keep each demo under 45 seconds after editing.
-- Keep raw captures local; commit only the content-only compressed public media.
+- Capture three states for each direction: source Context and invocation, the
+  new target session output, and the result returned to the source session.
+- Do not add title cards or imply that a sequence of still images is a video.
+- Keep raw captures local; commit only content-only compressed screenshots.

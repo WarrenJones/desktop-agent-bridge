@@ -26,27 +26,52 @@ Desktop Agent Bridge ──► 新的原生 Desktop review session
        └──────── 最终结论 ───────────┘
 ```
 
-目前内置的第一个 workflow 是 `peer-review`：
+比如相互 review：
 
-- 在 Codex Desktop 中：`$peer-review Ask Claude to review the current changes.`
-- 在 Claude Desktop 中：`/peer-review Ask Codex to review the current changes.`
+- 在 Codex Desktop 中让 Claude Desktop 帮忙 review：`$peer-review Ask Claude to review the current changes.`
+- 在 Claude Desktop 中让 Codex Desktop 帮忙 review：`/peer-review Ask Codex to review the current changes.`
 - 两个方向的 reviewer 都检查同一份当前工作树且不修改代码；Codex 使用只读 sandbox，Claude 使用 Manual 审批模式。
 - 底层 handoff 引擎与 review 方法解耦，第三方 Skill 可以基于它实现安全审查、架构挑战、测试方案 review 等 workflow。
 
-### 两条真实的原生 Desktop handoff
+### 一次真实 handoff 到底是什么样
 
-下面的录屏使用公开 [`demo-review-project`](examples/demo-review-project)。关键产品决策**只存在于源对话里**，仓库和 review 请求中都没有直接写出预期问题；目标 Agent 仍然准确找到缺陷，这证明源会话 Context 确实通过 DAB 到达了另一个 Agent。录屏只保留 demo 对话内容区，不包含私人侧栏、其他任务、账号信息、通知或本地路径。
+下面的截图来自公开 [`demo-review-project`](examples/demo-review-project) 中真实跑通的两条 handoff。两个例子里，关键产品决策都**只存在于 Agent A 的对话中**，仓库里没有，发给 Agent B 的请求里也没有。所有图片都只保留 demo 内容区，排除了私人侧栏、其他任务、账号信息、通知和本地路径。
 
-| Codex Desktop → Claude Desktop | Claude Desktop → Codex Desktop |
-| --- | --- |
-| Codex 知道“会员积分不能抵扣运费”。DAB 新建 Claude Desktop session；Claude 发现 `checkoutTotal` 错误抵扣了运费；结论返回 Codex。 | Claude 知道“到达 `expiresAt` 的精确时刻就算过期”。DAB 新建 Codex Desktop task；Codex 发现 `>` 应为 `>=` 的边界问题；结论返回 Claude。 |
-| [![观看 Codex 调用 Claude review](https://raw.githubusercontent.com/WarrenJones/desktop-agent-bridge/main/docs/assets/demos/codex-to-claude.gif)](https://github.com/WarrenJones/desktop-agent-bridge/blob/main/docs/assets/demos/codex-to-claude.mp4) | [![观看 Claude 调用 Codex review](https://raw.githubusercontent.com/WarrenJones/desktop-agent-bridge/main/docs/assets/demos/claude-to-codex.gif)](https://github.com/WarrenJones/desktop-agent-bridge/blob/main/docs/assets/demos/claude-to-codex.mp4) |
+#### Codex Desktop → Claude Desktop → Codex Desktop
 
-视频中的 session 都是真实创建、并且可在原生应用中恢复的；只是把三个阶段剪到一起，让演示更短。
+1. **Agent A 已经完成工作，并在当前对话里掌握产品决策。** Codex 知道“会员积分可以抵扣商品小计，但不能抵扣运费”；这条规则故意没有写进仓库。
+
+   ![Codex 对话中保存着实现 Context](docs/assets/walkthrough/codex-source-context.jpg)
+
+2. **用户直接在同一条 Codex 对话里调用 `peer-review`。** 请求只让 Claude 按前面的决策 review，没有把预期缺陷透露给 Claude。
+
+   ![Codex 调用 Peer Review Skill](docs/assets/walkthrough/codex-invokes-peer-review.jpg)
+
+3. **DAB 在同一个项目下新建原生 Claude Desktop session。** Claude 读取转交的源会话 Context 和当前工作树，发现 `checkoutTotal` 会让超额积分抵扣运费。
+
+   ![新建的 Claude Desktop review session](docs/assets/walkthrough/claude-review-session.jpg)
+
+4. **Claude 的结论自动回到原来的 Codex task。** 用户不需要在两个窗口之间复制粘贴。
+
+   ![Claude review 结论返回 Codex](docs/assets/walkthrough/claude-result-in-codex.jpg)
+
+#### Claude Desktop → Codex Desktop → Claude Desktop
+
+1. **Agent A 掌握决策并调用 `peer-review`。** Claude 知道“到达 `expiresAt` 的精确时刻就算过期”，随后让 Codex review `src/token.js`，但 review 请求本身没有写这条规则。
+
+   ![Claude 对话 Context 与 Peer Review 调用](docs/assets/walkthrough/claude-source-context.jpg)
+
+2. **DAB 把源 transcript 导入新的持久 Codex Desktop task。** Codex 发现 `now > expiresAt` 会放过精确过期边界，必须改为 `>=`。
+
+   ![新建的 Codex Desktop review task](docs/assets/walkthrough/codex-review-session.jpg)
+
+3. **Codex 的结论自动回到原来的 Claude 对话。** 源对话明确说明：Codex 是从导入的 transcript 中得到这条规则，不是从 review 请求里的提示猜到的。
+
+   ![Codex review 结论返回 Claude](docs/assets/walkthrough/codex-result-in-claude.jpg)
 
 ## 2. 为什么需要它
 
-Agent 之间的委派早已存在，但我们调研的代表性产品解决的是不同边界：
+Agent 之间的调用早已存在，但我们调研的代表性产品解决的是不同边界：
 
 | 项目 | Agent 运行在哪里 | Context / 协作方式 | 原生 Codex Desktop ↔ Claude Desktop？ |
 | --- | --- | --- | --- |
@@ -103,6 +128,8 @@ Claude Desktop 目前没有公开的跨厂商 transcript importer，所以这个
 源 JSONL 永远不会被修改。`auto`、`full`、`raw` 可能把用户、Agent 或工具此前产生的文本暴露给目标模型供应商；跨供应商的敏感场景请使用 `bounded`。信任边界和失败语义见[核心架构](docs/architecture.md)。
 
 ## 4. 如何扩展自己的 Skill
+
+目前只有一个 `peer-review` Skill，但你可以自行扩展，让两个 Agent 做更多事情，也可以提 Issue。
 
 DAB 把 **workflow 语义** 与 **Desktop transport** 分开：
 

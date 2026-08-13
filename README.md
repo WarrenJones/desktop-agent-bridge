@@ -33,16 +33,41 @@ The first bundled workflow is `peer-review`:
 - Both reviewers inspect the same current working tree without modifying it; Codex uses a read-only sandbox, while Claude uses Manual approval mode.
 - The transport engine is generic; independent Skills can build security review, architecture challenge, test-plan review, or other handoffs.
 
-### Two real native Desktop handoffs
+### What a real handoff looks like
 
-These recordings use the public [`demo-review-project`](examples/demo-review-project). The critical product decision exists **only in the source conversation**, not in the repository or the review request. Each target agent still finds the intended defect, demonstrating that source-session context crossed the bridge. The recordings contain only the demo conversation area—no private sidebars, unrelated tasks, account details, notifications, or local paths.
+The screenshots below come from two real handoffs using the public [`demo-review-project`](examples/demo-review-project). In both examples, the critical product decision exists **only in Agent A's conversation**, not in the repository and not in the request sent to Agent B. Every screenshot is cropped to the demo content area; private sidebars, unrelated tasks, account details, notifications, and local paths are excluded.
 
-| Codex Desktop → Claude Desktop | Claude Desktop → Codex Desktop |
-| --- | --- |
-| Codex knows that membership credit must never pay shipping. DAB creates a Claude Desktop session; Claude finds that `checkoutTotal` incorrectly discounts shipping; the findings return to Codex. | Claude knows that a token expires at the exact `expiresAt` instant. DAB creates a Codex Desktop task; Codex finds the `>` versus `>=` boundary bug; the findings return to Claude. |
-| [![Watch Codex to Claude review](https://raw.githubusercontent.com/WarrenJones/desktop-agent-bridge/main/docs/assets/demos/codex-to-claude.gif)](https://github.com/WarrenJones/desktop-agent-bridge/blob/main/docs/assets/demos/codex-to-claude.mp4) | [![Watch Claude to Codex review](https://raw.githubusercontent.com/WarrenJones/desktop-agent-bridge/main/docs/assets/demos/claude-to-codex.gif)](https://github.com/WarrenJones/desktop-agent-bridge/blob/main/docs/assets/demos/claude-to-codex.mp4) |
+#### Codex Desktop → Claude Desktop → Codex Desktop
 
-The sessions in these videos are real and recoverable in the native apps; the three stages are cut together only to keep each walkthrough short.
+1. **Agent A has finished the work and holds a decision in its conversation.** Codex knows that membership credit may reduce item subtotal but must never pay shipping. That rule is intentionally absent from the repository.
+
+   ![Codex conversation containing implementation context](docs/assets/walkthrough/codex-source-context.jpg)
+
+2. **The user invokes `peer-review` in that same Codex conversation.** The request asks Claude to review against earlier decisions without revealing the expected defect.
+
+   ![Codex invokes the Peer Review Skill](docs/assets/walkthrough/codex-invokes-peer-review.jpg)
+
+3. **DAB creates a new native Claude Desktop session in the same project.** Claude reads the transferred source-session context and the live working tree, then finds that `checkoutTotal` lets excess credit pay shipping.
+
+   ![New Claude Desktop review session](docs/assets/walkthrough/claude-review-session.jpg)
+
+4. **Claude's result returns to the original Codex task automatically.** No copy and paste is required.
+
+   ![Claude review result returned to Codex](docs/assets/walkthrough/claude-result-in-codex.jpg)
+
+#### Claude Desktop → Codex Desktop → Claude Desktop
+
+1. **Agent A holds the decision and invokes `peer-review`.** Claude knows that a token is expired at the exact `expiresAt` instant, then asks Codex to review `src/token.js` without putting that rule in the review request.
+
+   ![Claude conversation context and Peer Review invocation](docs/assets/walkthrough/claude-source-context.jpg)
+
+2. **DAB imports the source transcript into a new persistent Codex Desktop task.** Codex finds that `now > expiresAt` accepts the exact expiration boundary and must be `>=`.
+
+   ![New Codex Desktop review task](docs/assets/walkthrough/codex-review-session.jpg)
+
+3. **Codex's findings return to the original Claude conversation automatically.** The source conversation explicitly notes that Codex derived the rule from the imported transcript rather than a hint in the request.
+
+   ![Codex review result returned to Claude](docs/assets/walkthrough/codex-result-in-claude.jpg)
 
 ## 2. Why it needs to exist
 
