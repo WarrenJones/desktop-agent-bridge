@@ -1,6 +1,6 @@
 {
   "name": "desktop-agent-bridge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local-first handoffs between native Codex Desktop and Claude Desktop sessions.",
   "keywords": [
     "codex",
@@ -19,6 +19,9 @@
   },
   "author": "WarrenJones",
   "type": "module",
+  "exports": {
+    ".": "./src/index.js"
+  },
   "bin": {
     "dab": "bin/dab.js"
   },
@@ -43,6 +46,8 @@
     "src/",
     "scripts/",
     "integrations/",
+    ".claude-plugin/",
+    "examples/",
     "docs/",
     "README.md",
     "LICENSE"

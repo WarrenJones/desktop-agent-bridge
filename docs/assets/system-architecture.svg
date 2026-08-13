@@ -27,7 +27,7 @@
 
   <rect width="1400" height="820" fill="#f8fafc"/>
   <text x="60" y="52" class="title">Native Desktop handoff, adapter by adapter</text>
-  <text x="60" y="78" class="subtitle">No bridge daemon, shared database, API key, or vendor-neutral session protocol is introduced in v0.1.0.</text>
+  <text x="60" y="78" class="subtitle">v0.2 adds source-session context and host-native Skill packaging without a bridge daemon or shared database.</text>
 
   <rect x="45" y="110" width="290" height="570" rx="22" fill="#eef2ff" stroke="#c7d2fe" stroke-width="2"/>
   <text x="70" y="143" class="group">SOURCE DESKTOP</text>
@@ -45,27 +45,27 @@
   <text x="92" y="366" class="small">Claude → Codex request</text>
 
   <rect x="70" y="414" width="240" height="160" rx="14" fill="#ffffff" stroke="#cbd5e1"/>
-  <text x="92" y="445" class="boxTitle">Bounded handoff context</text>
-  <text x="92" y="474" class="boxText">• review request</text>
-  <text x="92" y="497" class="boxText">• decisions and constraints</text>
-  <text x="92" y="520" class="boxText">• unresolved questions</text>
-  <text x="92" y="550" class="small">Repository content is not copied.</text>
+  <text x="92" y="445" class="boxTitle">Source-session context</text>
+  <text x="92" y="474" class="boxText">• workflow request</text>
+  <text x="92" y="497" class="boxText">• auto · full · raw · bounded</text>
+  <text x="92" y="520" class="boxText">• transcript path + hash</text>
+  <text x="92" y="550" class="small">Repository content is still read live.</text>
 
   <rect x="382" y="110" width="550" height="570" rx="22" fill="#ecfeff" stroke="#a5f3fc" stroke-width="2"/>
   <text x="407" y="143" class="group">DESKTOP-AGENT-BRIDGE (LOCAL NODE.JS PROCESS)</text>
 
   <rect x="407" y="170" width="500" height="78" rx="14" fill="#ffffff" stroke="#67e8f9" filter="url(#shadow)"/>
   <text x="432" y="200" class="boxTitle">CLI boundary · src/cli.js</text>
-  <text x="432" y="225" class="boxText">Parse cwd, request, context, target, timeout; select one runner.</text>
+  <text x="432" y="225" class="boxText">Parse workflow, context mode, cwd, target, timeout; select one runner.</text>
 
   <rect x="407" y="270" width="500" height="92" rx="14" fill="#ffffff" stroke="#67e8f9"/>
-  <text x="432" y="300" class="boxTitle">Review envelope · src/core.js</text>
+  <text x="432" y="300" class="boxTitle">Handoff envelope · src/core.js</text>
   <text x="432" y="325" class="boxText">Random boundary + request ID · untrusted source data · read-only policy</text>
   <text x="432" y="347" class="small">The repository remains the reviewer's source of truth.</text>
 
   <rect x="407" y="388" width="236" height="208" rx="14" fill="#eff6ff" stroke="#93c5fd"/>
   <text x="430" y="418" class="boxTitle">Claude target adapter</text>
-  <text x="430" y="445" class="boxText">1. JXA Accessibility driver</text>
+  <text x="430" y="445" class="boxText">1. Normalize Codex transcript</text>
   <text x="430" y="468" class="boxText">2. New native Code session</text>
   <text x="430" y="491" class="boxText">3. Manual permission mode</text>
   <text x="430" y="514" class="boxText">4. Poll local JSONL transcript</text>
@@ -74,10 +74,10 @@
 
   <rect x="671" y="388" width="236" height="208" rx="14" fill="#ecfdf5" stroke="#6ee7b7"/>
   <text x="694" y="418" class="boxTitle">Codex target adapter</text>
-  <text x="694" y="445" class="boxText">1. Desktop-bundled runtime</text>
-  <text x="694" y="468" class="boxText">2. codex exec --json</text>
-  <text x="694" y="491" class="boxText">3. read-only sandbox</text>
-  <text x="694" y="514" class="boxText">4. Parse thread + final message</text>
+  <text x="694" y="445" class="boxText">1. Import Claude JSONL</text>
+  <text x="694" y="468" class="boxText">2. Resume persistent thread</text>
+  <text x="694" y="491" class="boxText">3. codex exec · read-only</text>
+  <text x="694" y="514" class="boxText">4. Parse final message</text>
   <text x="694" y="537" class="boxText">5. Open codex:// deep link</text>
   <text x="694" y="566" class="small">Runtime and deep-link boundary</text>
 
@@ -107,15 +107,15 @@
 
   <path d="M310 218 C350 218, 360 208, 407 208" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
   <path d="M310 334 C350 334, 360 220, 407 220" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
-  <text x="330" y="188" class="arrowLabel">dab review</text>
+  <text x="330" y="188" class="arrowLabel">dab handoff</text>
 
   <path d="M643 493 C780 493, 835 241, 995 241" fill="none" stroke="#2563eb" stroke-width="3" marker-end="url(#arrowBlue)"/>
   <path d="M907 493 C950 493, 950 413, 995 413" fill="none" stroke="#059669" stroke-width="3" marker-end="url(#arrowGreen)"/>
 
   <path d="M1160 610 C1160 730, 315 730, 315 564" fill="none" stroke="#475569" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#arrow)"/>
-  <text x="665" y="754" class="arrowLabel">exact final review + destination session ID</text>
+  <text x="665" y="754" class="arrowLabel">exact workflow result + destination session ID</text>
 
   <rect x="382" y="706" width="550" height="72" rx="14" fill="#ffffff" stroke="#cbd5e1"/>
   <text x="407" y="735" class="boxTitle">Shared working tree</text>
-  <text x="407" y="760" class="boxText">Both agents inspect the same cwd; only non-repository conversational context crosses the bridge.</text>
+  <text x="407" y="760" class="boxText">Both agents inspect the same cwd; source history crosses through native import or a DAB transcript artifact.</text>
 </svg>

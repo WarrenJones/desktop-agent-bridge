@@ -2,19 +2,19 @@
 
 Local-first, native Desktop handoffs between Codex and Claude.
 
-The MVP supports one workflow in both directions: create an independent read-only code review in the other coding agent, keep that review as a native Desktop session/thread, and return the final review to the source conversation.
+The package provides a read-only handoff engine in both directions. The bundled `peer-review` Skill is the first workflow: it gives the other agent access to the source session context, creates a native Desktop session/thread, and returns the final result to the source conversation. Third-party Skills can build other workflows on the same CLI or Node API.
 
-For component boundaries, bidirectional lifecycle diagrams, trust guarantees, failure semantics, and adapter maintenance guidance, see the [core architecture](docs/architecture.md).
+For component boundaries, bidirectional lifecycle diagrams, trust guarantees, failure semantics, and adapter maintenance guidance, see the [core architecture](docs/architecture.md). For the market evidence behind the product, the Context model, and the pluggable Skill boundary, see [why DAB exists](docs/research-and-rationale.md).
 
 ## What works today
 
 ### Codex Desktop → Claude Desktop
 
-`dab` creates a new Claude Desktop Code session in the same project, switches it to Manual permission mode, submits a bounded review request, waits for the persisted Claude transcript to reach a real text `end_turn`, and returns the exact final response plus the Claude session ID.
+`dab` locates the current Codex rollout through `CODEX_THREAD_ID`, writes a normalized full transcript under DAB's user-level state directory, and points a new Claude Desktop Code session at that artifact. It switches the session to Manual permission mode, waits for a real text `end_turn`, and returns the exact final response plus the Claude session ID.
 
 ### Claude Desktop → Codex Desktop
 
-`dab` runs the Codex Desktop-bundled runtime with a read-only sandbox and isolated connector configuration, while still loading the repository's project rules. It captures the persistent thread ID and final agent message, then opens `codex://threads/<id>` in Codex Desktop.
+The Claude plugin captures the exact current JSONL path in a `SessionStart` hook. In `auto` mode, DAB asks Codex's external-agent importer to convert that Claude history into a persistent Codex thread, then resumes it with the workflow request under a read-only sandbox. If the installed Codex runtime does not support import, DAB falls back to a normalized full-transcript artifact and a new persistent thread.
 
 If the deep link cannot be opened, the completed review is still returned and the JSON result includes `handoffError`.
 
@@ -28,7 +28,7 @@ If the deep link cannot be opened, the completed review is still returned and th
 
 ## Install
 
-Install the public npm package globally, then install the two Desktop skills:
+Install the public npm package globally, then install the Codex user Skill and Claude user Plugin:
 
 ```bash
 npm install -g desktop-agent-bridge
@@ -58,9 +58,9 @@ This installs:
 
 - `~/.local/bin/dab`
 - `~/.agents/skills/peer-review/SKILL.md` for Codex
-- `~/.claude/skills/peer-review/SKILL.md` for Claude
+- `desktop-agent-bridge@desktop-agent-bridge` through Claude's native user-scope Plugin marketplace
 
-The install command places the `peer-review` skill in both user-level skill directories. The complete Claude plugin can also be loaded during plugin development with:
+The Claude Plugin contains the `peer-review` Skill and the `SessionStart` transcript hook. During plugin development it can also be loaded directly with:
 
 ```bash
 claude --plugin-dir ./integrations/claude-plugin
@@ -85,29 +85,74 @@ Natural-language requests such as “ask Claude/Codex to independently review th
 ## CLI
 
 ```bash
-dab review \
+dab handoff \
   --to claude \
   --cwd "$PWD" \
   --request "Review the current uncommitted changes" \
-  --context "The token fallback was intentionally removed" \
+  --workflow peer-review \
+  --context-mode auto \
   --json
 ```
 
 ```bash
-dab review \
+dab handoff \
   --to codex \
   --cwd "$PWD" \
   --request "Review the current uncommitted changes" \
-  --context "The token fallback was intentionally removed" \
+  --workflow peer-review \
+  --context-mode auto \
   --json
 ```
+
+`dab review` remains a backwards-compatible alias. Context modes are:
+
+| Mode | Behavior |
+| --- | --- |
+| `bounded` | Only `--context` is sent. This is the default for direct CLI compatibility. |
+| `auto` | Native import for Claude → Codex; otherwise a normalized full transcript. Bundled Skills use this mode. |
+| `full` | Always produce a normalized full transcript artifact. |
+| `raw` | Give the target the exact source JSONL path and SHA-256. |
+
+The normalized transcript keeps user/assistant text, converts relevant Claude tool activity to bounded notes, and excludes source-host control messages, hidden reasoning, meta records, and sidechains. The source JSONL is never modified.
+
+## Build a pluggable Skill
+
+A third-party Skill owns workflow semantics and calls DAB for transport. It can live in its own GitHub repository, npm package, Claude Plugin, or user-scope Agent Skill; it does not need files in the business repository.
+
+```bash
+dab handoff \
+  --to <claude-or-codex> \
+  --cwd "$PWD" \
+  --request "<workflow task>" \
+  --workflow <workflow-name> \
+  --instructions "<result contract>" \
+  --context-mode auto \
+  --json
+```
+
+Node-based packages can instead import `handoff`:
+
+```js
+import { handoff } from "desktop-agent-bridge";
+
+const result = await handoff({
+  to: "claude",
+  cwd: process.cwd(),
+  request: "Perform an independent security review.",
+  workflow: "security-review",
+  contextMode: "auto",
+});
+```
+
+See the [Skill package authoring guide](docs/skill-packages.md) and the [security-review example](examples/security-review-skill).
 
 ## Safety boundary
 
 - Codex uses `--sandbox read-only`.
 - Claude Desktop is switched to Manual permission mode before submission, so file changes require explicit user approval. Do not approve changes during a review. Unlike the Codex adapter, this is not an OS-level read-only sandbox.
 - The prompt also prohibits modifications, branch changes, commits, pushes, deployments, and destructive commands.
-- Source-agent context is marked as untrusted data and cannot override the review constraints.
+- Source-agent context is marked as untrusted historical data and cannot override the review constraints.
+- `auto`, `full`, and `raw` can expose transcript content—including content previously returned by tools—to the destination model provider. Use `bounded` when the source transcript contains data that must not cross providers.
 - Review requests use the existing local login state of each Desktop application. The bridge stores no credentials.
 
 Claude Desktop does not currently expose a stable public session-creation automation API. The Claude adapter therefore uses semantic macOS Accessibility elements, isolated in `scripts/claude-desktop.jxa`. A Desktop UI update may require updating only this adapter.

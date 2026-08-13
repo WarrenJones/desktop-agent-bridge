@@ -1,5 +1,9 @@
 {
   "name": "desktop-agent-bridge",
   "description": "Hand off read-only reviews from Claude Desktop to native Codex threads.",
-  "version": "0.1.0"
+  "version": "0.2.0",
+  "author": {
+    "name": "WarrenJones",
+    "url": "https://github.com/WarrenJones"
+  }
 }

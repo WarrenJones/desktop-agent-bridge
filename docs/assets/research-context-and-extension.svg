@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">DAB market gap, context layers, and extension boundary</title>
+  <desc id="desc">A diagram comparing the missing native Desktop bridge with context transfer layers and host-native skill packaging.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7f8fc"/>
+      <stop offset="1" stop-color="#eef3ff"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#172554" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <rect width="1280" height="720" rx="28" fill="url(#bg)"/>
+  <text x="64" y="66" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="30" font-weight="700" fill="#0f172a">What DAB adds — and what it reuses</text>
+  <text x="64" y="100" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="16" fill="#475569">Native Desktop session bridging is the missing layer; context and skills already have reusable patterns.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="64" y="136" width="1152" height="176" rx="22" fill="#ffffff"/>
+  </g>
+  <text x="92" y="174" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="18" font-weight="700" fill="#334155">Exact product gap</text>
+
+  <rect x="96" y="198" width="246" height="78" rx="16" fill="#111827"/>
+  <text x="219" y="230" text-anchor="middle" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="17" font-weight="650" fill="#ffffff">Codex Desktop</text>
+  <text x="219" y="255" text-anchor="middle" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="13" fill="#cbd5e1">current source task</text>
+
+  <line x1="342" y1="237" x2="480" y2="237" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+  <rect x="484" y="190" width="312" height="94" rx="18" fill="#e0e7ff" stroke="#6366f1" stroke-width="2"/>
+  <text x="640" y="224" text-anchor="middle" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="20" font-weight="750" fill="#3730a3">DAB</text>
+  <text x="640" y="250" text-anchor="middle" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="13" fill="#4338ca">create · correlate · wait · return</text>
+  <line x1="796" y1="237" x2="934" y2="237" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="938" y="198" width="246" height="78" rx="16" fill="#d97706"/>
+  <text x="1061" y="230" text-anchor="middle" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="17" font-weight="650" fill="#ffffff">Claude Desktop</text>
+  <text x="1061" y="255" text-anchor="middle" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="13" fill="#ffedd5">new visible session</text>
+
+  <path d="M1061 284 C1061 320 219 320 219 284" fill="none" stroke="#16a34a" stroke-width="3" stroke-dasharray="8 7" marker-end="url(#arrow)"/>
+  <text x="640" y="301" text-anchor="middle" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="13" font-weight="650" fill="#15803d">final result returns to source</text>
+
+  <g filter="url(#shadow)">
+    <rect x="64" y="344" width="552" height="310" rx="22" fill="#ffffff"/>
+    <rect x="640" y="344" width="576" height="310" rx="22" fill="#ffffff"/>
+  </g>
+
+  <text x="92" y="386" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="18" font-weight="700" fill="#334155">Full context is transferred through explicit layers</text>
+  <rect x="96" y="416" width="488" height="46" rx="12" fill="#dcfce7"/>
+  <text x="116" y="445" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="15" font-weight="650" fill="#166534">1. Live repository</text>
+  <text x="558" y="445" text-anchor="end" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="13" fill="#166534">code · diff · project rules</text>
+
+  <rect x="112" y="474" width="456" height="46" rx="12" fill="#dbeafe"/>
+  <text x="132" y="503" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="15" font-weight="650" fill="#1e40af">2. Task request</text>
+  <text x="542" y="503" text-anchor="end" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="13" fill="#1e40af">what B should do</text>
+
+  <rect x="128" y="532" width="424" height="46" rx="12" fill="#ede9fe"/>
+  <text x="148" y="561" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="15" font-weight="650" fill="#5b21b6">3. Normalized full transcript</text>
+  <text x="526" y="561" text-anchor="end" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="13" fill="#5b21b6">messages · bounded tool notes</text>
+
+  <rect x="144" y="590" width="392" height="40" rx="12" fill="#fef3c7" stroke="#f59e0b" stroke-dasharray="5 4"/>
+  <text x="164" y="616" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="13" font-weight="650" fill="#92400e">4. Native import when supported</text>
+  <text x="516" y="616" text-anchor="end" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="10" fill="#92400e">auto + normalized fallback</text>
+
+  <text x="668" y="386" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="18" font-weight="700" fill="#334155">Extension model: reuse host-native packaging</text>
+
+  <rect x="674" y="418" width="200" height="80" rx="16" fill="#111827"/>
+  <text x="774" y="451" text-anchor="middle" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="17" font-weight="700" fill="#ffffff">DAB npm engine</text>
+  <text x="774" y="476" text-anchor="middle" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="12" fill="#cbd5e1">stable CLI + Node API</text>
+
+  <line x1="874" y1="458" x2="938" y2="458" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="942" y="408" width="238" height="100" rx="16" fill="#e0e7ff"/>
+  <text x="1061" y="442" text-anchor="middle" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="17" font-weight="700" fill="#3730a3">Workflow Skill</text>
+  <text x="1061" y="466" text-anchor="middle" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="12" fill="#4338ca">SKILL.md · scripts · resources</text>
+  <text x="1061" y="487" text-anchor="middle" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="12" fill="#4338ca">owned by first or third party</text>
+
+  <path d="M1061 508 L1061 548 L770 548 L770 574" fill="none" stroke="#64748b" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <path d="M1061 508 L1061 574" fill="none" stroke="#64748b" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+  <rect x="674" y="578" width="208" height="52" rx="13" fill="#f1f5f9"/>
+  <text x="778" y="600" text-anchor="middle" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" font-weight="650" fill="#334155">User-scope Agent Skill</text>
+  <text x="778" y="618" text-anchor="middle" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="11" fill="#64748b">no project source changes</text>
+
+  <rect x="946" y="578" width="234" height="52" rx="13" fill="#f1f5f9"/>
+  <text x="1063" y="600" text-anchor="middle" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" font-weight="650" fill="#334155">Host plugin marketplace</text>
+  <text x="1063" y="618" text-anchor="middle" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="11" fill="#64748b">versioning · install · update</text>
+</svg>

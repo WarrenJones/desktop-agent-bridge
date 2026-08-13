@@ -35,6 +35,58 @@ test("parseCliArgs accepts the npm post-install setup command", () => {
   assert.deepEqual(parseCliArgs(["install"]), { command: "install" });
 });
 
+test("parseCliArgs accepts full transcript handoff options", () => {
+  const parsed = parseCliArgs([
+    "handoff",
+    "--to",
+    "codex",
+    "--request",
+    "Challenge the architecture",
+    "--context-mode",
+    "auto",
+    "--source-transcript",
+    "/tmp/source.jsonl",
+    "--workflow",
+    "architecture-challenge",
+    "--instructions",
+    "Return assumptions before findings.",
+  ]);
+
+  assert.equal(parsed.command, "handoff");
+  assert.equal(parsed.contextMode, "auto");
+  assert.equal(parsed.sourceTranscript, "/tmp/source.jsonl");
+  assert.equal(parsed.workflow, "architecture-challenge");
+  assert.equal(parsed.instructions, "Return assumptions before findings.");
+});
+
+test("parseCliArgs gives generic handoffs a non-review workflow", () => {
+  const parsed = parseCliArgs([
+    "handoff",
+    "--to",
+    "claude",
+    "--request",
+    "Create a test plan",
+  ]);
+
+  assert.equal(parsed.workflow, "custom-handoff");
+});
+
+test("parseCliArgs rejects unsupported context modes", () => {
+  assert.throws(
+    () =>
+      parseCliArgs([
+        "review",
+        "--to",
+        "claude",
+        "--request",
+        "Review it",
+        "--context-mode",
+        "everything",
+      ]),
+    /--context-mode must be/,
+  );
+});
+
 test("main installs both Desktop skills for the current user", async () => {
   const calls = [];
   let stdout = "";

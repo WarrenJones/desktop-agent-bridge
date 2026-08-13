@@ -132,6 +132,18 @@ function press(element) {
   throw new Error("The selected Claude Desktop control cannot be pressed.");
 }
 
+function pressVisible(element) {
+  const actions = element.actions();
+  for (let index = 0; index < actions.length; index += 1) {
+    if (safeRead(actions[index], "name") === "AXScrollToVisible") {
+      actions[index].perform();
+      delay(0.2);
+      break;
+    }
+  }
+  press(element);
+}
+
 function waitFor(find, timeoutMs, description) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -181,7 +193,7 @@ function run(argv) {
     );
   }
 
-  if (newSession) press(newSession);
+  if (newSession) pressVisible(newSession);
 
   const promptArea = waitFor(
     () => findNewSessionPrompt(window),

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   buildCodexArgs,
+  buildCodexResumeArgs,
   buildReviewPrompt,
   parseClaudeTranscript,
   parseCodexJsonl,
@@ -288,6 +289,26 @@ test("buildCodexArgs isolates connectors and keeps the task persistent", () => {
   ]);
   assert.equal(args.includes("--ephemeral"), false);
   assert.deepEqual(args.slice(-4), ["-C", "/repo", "--", "review this"]);
+});
+
+test("buildCodexResumeArgs continues an imported session under the review sandbox", () => {
+  const args = buildCodexResumeArgs({
+    cwd: "/repo",
+    threadId: "imported-thread",
+    prompt: "review this",
+  });
+
+  assert.deepEqual(args.slice(0, 7), [
+    "exec",
+    "--json",
+    "--sandbox",
+    "read-only",
+    "--ignore-user-config",
+    "--config",
+    "mcp_servers={}",
+  ]);
+  assert.deepEqual(args.slice(-3), ["resume", "imported-thread", "review this"]);
+  assert.equal(args.includes("/repo"), true);
 });
 
 test("parseCodexJsonl returns the thread and last agent message", () => {

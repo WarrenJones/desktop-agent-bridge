@@ -7,11 +7,14 @@ import { fileURLToPath } from "node:url";
 
 import {
   buildCodexArgs,
+  buildCodexResumeArgs,
   buildReviewPrompt,
   parseClaudeTranscript,
   parseCodexJsonl,
   resolveCodexRuntime,
 } from "./core.js";
+import { prepareHandoffContext } from "./context.js";
+import { importClaudeSession as importClaudeSessionDefault } from "./codex-import.js";
 
 const DEFAULT_CLAUDE_DRIVER = fileURLToPath(
   new URL("../scripts/claude-desktop.jxa", import.meta.url),
@@ -132,23 +135,79 @@ export async function runCodexReview({
   cwd,
   request,
   context = "",
+  contextMode = "bounded",
+  sourceTranscript,
+  workflow = "peer-review",
+  instructions = "",
   execute = executeProcess,
   runtime = resolveCodexRuntime(),
   openUrl = defaultOpenUrl,
   onProgress,
   timeoutMs = 600_000,
   requestId = randomUUID(),
+  prepareContext = prepareHandoffContext,
+  importClaudeSession = importClaudeSessionDefault,
+  now = Date.now,
 }) {
+  const startedAt = now();
+  let prepared = await prepareContext({
+    sourceAgent: "claude",
+    targetAgent: "codex",
+    contextMode,
+    context,
+    sourceTranscript,
+    requestId,
+  });
   const prompt = buildReviewPrompt({
     sourceAgent: "claude",
     request,
-    context,
+    context: prepared.promptContext,
     boundary: requestId,
+    workflow,
+    instructions,
   });
-  const execution = await execute(runtime, buildCodexArgs({ cwd, prompt }), {
+  let importedThreadId;
+  let args;
+  if (prepared.strategy === "native-import") {
+    try {
+      importedThreadId = await importClaudeSession({
+        sourcePath: prepared.sourceTranscriptPath,
+        cwd,
+        runtime,
+        timeoutMs,
+      });
+      args = buildCodexResumeArgs({ cwd, threadId: importedThreadId, prompt });
+    } catch (error) {
+      if (contextMode !== "auto") throw error;
+      prepared = await prepareContext({
+        sourceAgent: "claude",
+        targetAgent: "codex",
+        contextMode: "full",
+        context,
+        sourceTranscript: prepared.sourceTranscriptPath,
+        requestId,
+      });
+      prepared.fallbackReason = error.message;
+      args = buildCodexArgs({
+        cwd,
+        prompt: buildReviewPrompt({
+          sourceAgent: "claude",
+          request,
+          context: prepared.promptContext,
+          boundary: requestId,
+          workflow,
+          instructions,
+        }),
+      });
+    }
+  } else {
+    args = buildCodexArgs({ cwd, prompt });
+  }
+  const remainingTimeoutMs = Math.max(1, timeoutMs - (now() - startedAt));
+  const execution = await execute(runtime, args, {
     cwd,
     onStderr: onProgress,
-    timeoutMs,
+    timeoutMs: remainingTimeoutMs,
   });
 
   if (execution.timedOut) {
@@ -159,10 +218,11 @@ export async function runCodexReview({
   }
 
   const parsed = parseCodexJsonl(execution.stdout);
+  const threadId = parsed.threadId ?? importedThreadId;
   let handoffError;
-  if (parsed.threadId) {
+  if (threadId) {
     try {
-      await openUrl(`codex://threads/${encodeURIComponent(parsed.threadId)}`);
+      await openUrl(`codex://threads/${encodeURIComponent(threadId)}`);
     } catch (error) {
       handoffError = error.message;
     }
@@ -170,8 +230,9 @@ export async function runCodexReview({
 
   return {
     target: "codex",
-    sessionId: parsed.threadId,
+    sessionId: threadId,
     result: parsed.result,
+    ...(contextMode !== "bounded" ? { context: publicContext(prepared) } : {}),
     ...(handoffError ? { handoffError } : {}),
   };
 }
@@ -180,18 +241,33 @@ export async function runClaudeReview({
   cwd,
   request,
   context = "",
+  contextMode = "bounded",
+  sourceTranscript,
+  workflow = "peer-review",
+  instructions = "",
   execute = executeProcess,
   driverPath = DEFAULT_CLAUDE_DRIVER,
   timeoutMs = 600_000,
   requestId = randomUUID(),
   waitForTranscript = waitForClaudeTranscript,
   now = Date.now,
+  prepareContext = prepareHandoffContext,
 }) {
+  const prepared = await prepareContext({
+    sourceAgent: "codex",
+    targetAgent: "claude",
+    contextMode,
+    context,
+    sourceTranscript,
+    requestId,
+  });
   const prompt = `${buildReviewPrompt({
     sourceAgent: "codex",
     request,
-    context,
+    context: prepared.promptContext,
     boundary: requestId,
+    workflow,
+    instructions,
   })}\n\nDAB_REQUEST_ID:${requestId}`;
   const startedAt = now();
   const execution = await execute(
@@ -232,5 +308,21 @@ export async function runClaudeReview({
     target: "claude",
     sessionId: transcript.sessionId,
     result: transcript.result,
+    ...(contextMode !== "bounded" ? { context: publicContext(prepared) } : {}),
   };
+}
+
+function publicContext(prepared) {
+  return Object.fromEntries(
+    [
+      "requestedMode",
+      "strategy",
+      "sourceTranscriptPath",
+      "artifactPath",
+      "sha256",
+      "fallbackReason",
+    ]
+      .filter((key) => prepared[key] !== undefined)
+      .map((key) => [key, prepared[key]]),
+  );
 }

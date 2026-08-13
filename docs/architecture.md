@@ -1,11 +1,11 @@
 # Architecture
 
-Status: implemented architecture for `desktop-agent-bridge` v0.1.x  
+Status: implemented architecture for `desktop-agent-bridge` v0.2.x
 Audience: contributors, adapter maintainers, and teams evaluating the trust boundary
 
-`desktop-agent-bridge` (DAB) creates a new, visible, native review session in another coding-agent Desktop application, waits for that session to complete, and returns the exact final review to the originating conversation.
+`desktop-agent-bridge` (DAB) transfers a workflow and source-session context into a new, visible native session in another coding-agent Desktop application, waits for completion, and returns the exact final result to the originating conversation.
 
-The system is intentionally small. It is not a new agent runtime, a shared chat server, or a repository knowledge base. The destination agent reads the current working tree directly; DAB carries only the conversational delta that the repository cannot provide.
+The system is intentionally small. It is not a new agent runtime, a shared chat server, or a repository knowledge base. The destination agent reads the current working tree directly while DAB makes the source transcript available through native import or a normalized local artifact.
 
 ## 1. Background and goals
 
@@ -13,7 +13,7 @@ The motivating workflow is symmetric:
 
 1. Agent A finishes a design or implementation in a repository.
 2. The user asks Agent B for an independent, read-only review.
-3. Agent B receives the same working directory plus a bounded summary of Agent A's intent and decisions.
+3. Agent B receives the same working directory and access to Agent A's source-session context.
 4. Agent B works in a new native Desktop session that remains visible and resumable.
 5. Agent B's final answer returns to Agent A's current conversation.
 
@@ -21,7 +21,7 @@ The goals are:
 
 - preserve each vendor's native Desktop session and existing login state;
 - make the target repository, not a copied transcript or diff, the source of truth;
-- transfer only context that cannot be recovered from the repository;
+- preserve the full source transcript as an auditable input while separating it from target instructions;
 - create an independently addressable destination session;
 - correlate one request with one terminal result without mixing sessions;
 - keep reviews read-only and preserve the result even if opening the destination UI fails;
@@ -31,17 +31,18 @@ This is better than manual copy/paste because the bridge owns destination-sessio
 
 ## 2. Current state and constraints
 
-The public CLI exposes two commands:
+The public CLI exposes three commands:
 
 ```bash
 dab install
 dab review --to <claude|codex> --cwd <path> --request <text> --context <text>
+dab handoff --to <claude|codex> --cwd <path> --request <text> --workflow <name> --context-mode <mode>
 ```
 
-The v0.1.x implementation has two target adapters with deliberately different mechanics:
+The v0.2.x implementation has two target adapters with deliberately different context mechanics:
 
-- **Claude target:** semantic macOS Accessibility automation creates and submits a native Claude Desktop Code session. DAB then polls Claude's persisted local JSONL transcripts for a correlated terminal response.
-- **Codex target:** the Codex runtime bundled with the Desktop app executes in non-interactive JSON mode with a read-only sandbox. DAB parses the persistent thread ID and final agent message, then opens that thread through a `codex://` deep link.
+- **Claude target:** DAB normalizes the current Codex rollout into a user-level artifact, semantic macOS Accessibility automation creates a Claude Desktop Code session, and the target is instructed to read the artifact before completing the workflow.
+- **Codex target:** DAB imports the current Claude JSONL through Codex app-server and resumes that persistent thread. Unsupported import versions fall back to a normalized artifact and a new thread.
 
 There is no daemon, network service, database, shared memory store, or DAB-managed credential. Every review is a foreground CLI process with one end-to-end timeout budget.
 
@@ -68,8 +69,10 @@ The common core owns policy and correlation. Target adapters own vendor-specific
 
 | Component | File | Responsibility |
 | --- | --- | --- |
-| Codex source skill | `integrations/codex-skill/peer-review/SKILL.md` | Selects the peer-review workflow, summarizes only unrecoverable context, and calls `dab review --to claude`. |
-| Claude source skill | `integrations/claude-plugin/skills/peer-review/SKILL.md` | Selects the peer-review workflow, applies the same context policy, and calls `dab review --to codex`. |
+| Codex source skill | `integrations/codex-skill/peer-review/SKILL.md` | Selects peer-review and calls `dab handoff --context-mode auto`. |
+| Claude source plugin | `integrations/claude-plugin` | Captures `transcript_path` at SessionStart and provides the peer-review Skill. |
+| Context engine | `src/context.js` | Locates source JSONL, normalizes cross-vendor history, hashes sources, and prepares mode-specific context. |
+| Codex importer | `src/codex-import.js` | Calls `externalAgentConfig/import`, waits for completion, and resolves the imported thread from Codex's ledger. |
 | CLI boundary | `src/cli.js` | Parses the command, resolves `cwd`, validates target and timeout, dispatches a runner, and renders the normalized result. |
 | Review envelope | `src/core.js` | Builds the read-only prompt, generates vendor arguments, and parses Codex/Claude terminal events. |
 | Target runners | `src/runners.js` | Own process execution, timeout accounting, transcript polling, deep-link opening, and normalized results. |
@@ -83,33 +86,47 @@ A long-running broker would add discovery, authentication, storage, lifecycle, a
 The useful abstraction today is a target adapter contract, not a transport protocol:
 
 ```ts
-type ReviewRequest = {
+type HandoffRequest = {
   cwd: string;
   request: string;
   context?: string;
+  contextMode?: "bounded" | "auto" | "full" | "raw";
+  sourceTranscript?: string;
+  workflow?: string;
+  instructions?: string;
   timeoutMs?: number;
 };
 
-type ReviewResult = {
+type HandoffResult = {
   target: "claude" | "codex";
   sessionId?: string;
   result: string;
+  context?: {
+    requestedMode: string;
+    strategy: string;
+    sourceTranscriptPath?: string;
+    artifactPath?: string;
+    sha256?: string;
+    fallbackReason?: string;
+  };
   handoffError?: string;
 };
 ```
 
 `handoffError` means the review completed but the native destination could not be opened. It is not a failed review.
 
-## 4. Review envelope and context model
+## 4. Handoff envelope and context model
 
-The source skill should send only:
+The prompt envelope contains the workflow request, optional workflow-specific instructions, and a context reference. Transcript content is treated as untrusted historical evidence, not as target policy.
 
-- the user's review request;
-- intentional design decisions;
-- constraints that are not encoded in the repository;
-- unresolved questions that should shape the review.
+| Mode | Strategy |
+| --- | --- |
+| `bounded` | Send only explicit `context`. |
+| `auto` | Native Claude → Codex import; normalized full transcript otherwise. |
+| `full` | Always write a normalized full transcript artifact. |
+| `raw` | Expose the canonical source JSONL path and SHA-256. |
 
-It should not send full conversations, credentials, environment variables, secrets, or large diffs. The target agent reads the repository and current Git diff directly.
+Normalized transcript artifacts live under `~/Library/Application Support/desktop-agent-bridge/handoffs/<request-id>/`; they do not modify the business repository. Codex developer/system records, hidden reasoning, meta events, and Claude sidechains are excluded. Claude tool calls/results become bounded notes. Raw JSONL remains unchanged.
 
 `buildReviewPrompt` wraps request and context in a per-request random boundary. The prompt declares source data untrusted and places the read-only rules outside that boundary. The Claude path also appends `DAB_REQUEST_ID:<uuid>` for transcript correlation.
 
@@ -136,8 +153,8 @@ $peer-review Ask Claude to review the current changes.
 
 Lifecycle:
 
-1. The Codex skill invokes `dab review --to claude` in the current repository.
-2. DAB generates a random request ID and bounded prompt.
+1. The Codex skill invokes `dab handoff --to claude --context-mode auto`.
+2. DAB uses `CODEX_THREAD_ID` to locate the exact rollout and writes a normalized transcript artifact.
 3. `osascript` runs `scripts/claude-desktop.jxa` with `cwd`, prompt, and the remaining timeout.
 4. The JXA adapter finds Claude Desktop by bundle ID and selects its standard window.
 5. It finds `New session in <project-name>` by accessible name or description, creates a session, and waits for the new-session prompt.
@@ -159,10 +176,10 @@ Trigger:
 
 Lifecycle:
 
-1. The Claude skill invokes `dab review --to codex` in the current repository.
-2. DAB builds the same bounded review envelope.
-3. Runtime resolution prefers `DAB_CODEX_BIN`, then the Codex binary bundled in `/Applications/ChatGPT.app`, then `codex` from `PATH`.
-4. DAB runs `codex exec --json --sandbox read-only` in `cwd`.
+1. The Claude Plugin's SessionStart hook exports the exact current transcript path through `CLAUDE_ENV_FILE`.
+2. The Claude Skill invokes `dab handoff --to codex --context-mode auto`.
+3. DAB calls Codex app-server `externalAgentConfig/import` and waits for its completion notification.
+4. DAB resolves the persistent thread ID from Codex's import ledger and runs `codex exec ... resume <thread-id>` under the read-only sandbox.
 5. User configuration is ignored and MCP servers, plugins, and apps are disabled for review isolation. Repository-level project instructions remain discoverable by the runtime.
 6. The JSONL parser captures `thread.started.thread_id` and the last completed `agent_message`.
 7. DAB attempts to open `codex://threads/<thread-id>`.
@@ -196,7 +213,7 @@ DAB does not stash, checkout, reset, create worktrees, or reconcile concurrent e
 
 ### 6.4 Local data
 
-The Claude completion watcher reads local transcript files to locate one correlated response. DAB does not copy those transcripts into its own store. The Codex path consumes runtime JSONL from the child process and does not maintain a separate history.
+The Claude completion watcher reads local transcript files to locate one correlated response. Full normalized handoffs persist a derived artifact in DAB's user-level state directory, together with the canonical source path and hash. DAB does not modify or replace vendor transcripts.
 
 ## 7. Failure model
 
@@ -327,11 +344,11 @@ The target-specific implementation belongs in an adapter. The review envelope, n
 
 Do not introduce a daemon, queue, database, or generalized protocol merely to add one adapter. Those components become justified only when the product needs concurrent jobs, remote machines, durable retries, multi-user routing, or cross-device state.
 
-## 12. What we will not do in v0.1.x
+## 12. What we will not do in v0.2.x
 
 - real-time agent-to-agent chat;
 - attach to an arbitrary already-running target session;
-- synchronize full conversation histories;
+- claim that Codex → Claude artifact handoff is native Claude history import;
 - duplicate repository files into a context store;
 - schedule or fan out multiple agents;
 - allow target agents to fix, commit, push, or deploy;

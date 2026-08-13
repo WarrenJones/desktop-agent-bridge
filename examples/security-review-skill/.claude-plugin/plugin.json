@@ -1,0 +1,6 @@
+{
+  "name": "dab-security-review",
+  "description": "Example security review workflow using desktop-agent-bridge.",
+  "version": "0.1.0",
+  "skills": "./skills/"
+}

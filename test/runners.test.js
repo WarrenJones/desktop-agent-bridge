@@ -183,3 +183,85 @@ test("runClaudeReview spends one timeout budget across submission and polling", 
 
   assert.equal(pollingTimeout, 750);
 });
+
+test("runClaudeReview prepares and exposes a normalized full source transcript", async () => {
+  const calls = [];
+  const result = await runClaudeReview({
+    cwd: "/repo",
+    request: "Review it",
+    contextMode: "auto",
+    requestId: "request-context",
+    prepareContext: async (options) => {
+      calls.push(options);
+      return {
+        requestedMode: "auto",
+        strategy: "normalized-transcript",
+        promptContext: "Read /state/source-context.md",
+        sourceTranscriptPath: "/source/codex.jsonl",
+        artifactPath: "/state/source-context.md",
+      };
+    },
+    execute: async (_command, args) => {
+      assert.match(args[4], /Read \/state\/source-context\.md/);
+      return {
+        exitCode: 0,
+        stdout: JSON.stringify({ submitted: true }),
+        stderr: "",
+      };
+    },
+    waitForTranscript: async () => ({ sessionId: "claude-session", result: "Done" }),
+  });
+
+  assert.equal(calls[0].sourceAgent, "codex");
+  assert.equal(calls[0].targetAgent, "claude");
+  assert.equal(calls[0].contextMode, "auto");
+  assert.equal(result.context.strategy, "normalized-transcript");
+  assert.equal(result.context.artifactPath, "/state/source-context.md");
+});
+
+test("runCodexReview imports a Claude transcript and resumes the native thread", async () => {
+  const executions = [];
+  const imports = [];
+  const result = await runCodexReview({
+    cwd: "/repo",
+    request: "Review it",
+    contextMode: "auto",
+    requestId: "request-native",
+    runtime: "/desktop/codex",
+    prepareContext: async () => ({
+      requestedMode: "auto",
+      strategy: "native-import",
+      promptContext: "Decision A",
+      sourceTranscriptPath: "/source/claude.jsonl",
+    }),
+    importClaudeSession: async (options) => {
+      imports.push(options);
+      return "imported-thread";
+    },
+    execute: async (command, args) => {
+      executions.push({ command, args });
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"imported-thread"}',
+          '{"type":"item.completed","item":{"type":"agent_message","text":"Finding"}}',
+        ].join("\n"),
+        stderr: "",
+      };
+    },
+    openUrl: async () => {},
+  });
+
+  assert.equal(imports[0].sourcePath, "/source/claude.jsonl");
+  assert.equal(imports[0].runtime, "/desktop/codex");
+  assert.deepEqual(executions[0].args.slice(-3), [
+    "resume",
+    "imported-thread",
+    executions[0].args.at(-1),
+  ]);
+  assert.deepEqual(result.context, {
+    requestedMode: "auto",
+    strategy: "native-import",
+    sourceTranscriptPath: "/source/claude.jsonl",
+  });
+});

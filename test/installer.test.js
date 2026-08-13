@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  ensureClaudePlugin,
   installLinks,
   skillLinkSpecifications,
 } from "../src/installer.js";
@@ -66,7 +67,7 @@ test("installLinks is idempotent for links already owned by the project", async 
   });
 });
 
-test("skillLinkSpecifications targets both Desktop skill directories", () => {
+test("skillLinkSpecifications uses the Codex user skill directory", () => {
   assert.deepEqual(
     skillLinkSpecifications({
       projectRoot: "/package",
@@ -78,12 +79,40 @@ test("skillLinkSpecifications targets both Desktop skill directories", () => {
         target: "/home/user/.agents/skills/peer-review",
         type: "dir",
       },
-      {
-        source:
-          "/package/integrations/claude-plugin/skills/peer-review",
-        target: "/home/user/.claude/skills/peer-review",
-        type: "dir",
-      },
     ],
   );
+});
+
+test("ensureClaudePlugin installs the first-party plugin through Claude's native marketplace", async () => {
+  const calls = [];
+  const execute = async (_command, args) => {
+    calls.push(args);
+    if (args.join(" ") === "plugin marketplace list --json") {
+      return { exitCode: 0, stdout: "[]", stderr: "" };
+    }
+    if (args.join(" ") === "plugin list --json") {
+      return { exitCode: 0, stdout: "[]", stderr: "" };
+    }
+    return { exitCode: 0, stdout: "", stderr: "" };
+  };
+
+  const result = await ensureClaudePlugin({
+    projectRoot: "/package",
+    execute,
+    claudeRuntime: "/bin/claude",
+  });
+
+  assert.deepEqual(calls, [
+    ["plugin", "marketplace", "list", "--json"],
+    ["plugin", "marketplace", "add", "/package"],
+    ["plugin", "list", "--json"],
+    [
+      "plugin",
+      "install",
+      "desktop-agent-bridge@desktop-agent-bridge",
+      "--scope",
+      "user",
+    ],
+  ]);
+  assert.equal(result.target, "desktop-agent-bridge@desktop-agent-bridge");
 });

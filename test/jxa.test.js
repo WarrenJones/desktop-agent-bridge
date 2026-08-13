@@ -12,7 +12,7 @@ const driverPath = fileURLToPath(
 );
 
 function loadDriver() {
-  const context = createContext({});
+  const context = createContext({ delay: () => {} });
   runInContext(readFileSync(driverPath, "utf8"), context);
   return context;
 }
@@ -107,6 +107,27 @@ test("inspects new-session controls from one accessibility snapshot", () => {
   assert.equal(snapshots, 1);
   assert.equal(result.newSession, newSessionButton);
   assert.equal(result.projectFormOpen, false);
+});
+
+test("scrolls a sidebar new-session control into view before pressing it", () => {
+  const driver = loadDriver();
+  const performed = [];
+  const button = {
+    actions: () => [
+      {
+        name: () => "AXPress",
+        perform: () => performed.push("press"),
+      },
+      {
+        name: () => "AXScrollToVisible",
+        perform: () => performed.push("scroll"),
+      },
+    ],
+  };
+
+  driver.pressVisible(button);
+
+  assert.deepEqual(performed, ["scroll", "press"]);
 });
 
 test(

@@ -3,6 +3,7 @@ import { installSkills } from "./installer.js";
 import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { CONTEXT_MODES } from "./context.js";
 
 const PROJECT_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -11,10 +12,15 @@ const HELP = `desktop-agent-bridge
 Usage:
   dab install
   dab review --to <claude|codex> --request <text> [options]
+  dab handoff --to <claude|codex> --request <text> [options]
 
 Options:
   --cwd <path>       Project directory (default: current directory)
   --context <text>   Decisions and conversational context from the source agent
+  --context-mode <mode>  bounded, auto, full, or raw (default: bounded)
+  --source-transcript <path>  Explicit source session JSONL
+  --workflow <name>  Workflow name for third-party skills
+  --instructions <text>  Workflow-specific result instructions
   --timeout <ms>     End-to-end timeout (default: 600000)
   --json             Print the complete result as JSON
   -h, --help         Show this help
@@ -26,7 +32,7 @@ export function parseCliArgs(args, defaultCwd = process.cwd()) {
     if (args.length > 1) throw new Error(`Unknown option: ${args[1]}`);
     return { command };
   }
-  if (command !== "review") {
+  if (!["review", "handoff"].includes(command)) {
     throw new Error(command ? `Unknown command: ${command}` : "A command is required.");
   }
 
@@ -38,6 +44,7 @@ export function parseCliArgs(args, defaultCwd = process.cwd()) {
     context: "",
     json: false,
     timeoutMs: 600_000,
+    ...(command === "handoff" ? { workflow: "custom-handoff" } : {}),
   };
 
   for (let index = 1; index < args.length; index += 1) {
@@ -46,14 +53,29 @@ export function parseCliArgs(args, defaultCwd = process.cwd()) {
       parsed.json = true;
       continue;
     }
-    if (["--to", "--cwd", "--request", "--context", "--timeout"].includes(flag)) {
+    if (
+      [
+        "--to",
+        "--cwd",
+        "--request",
+        "--context",
+        "--context-mode",
+        "--source-transcript",
+        "--workflow",
+        "--instructions",
+        "--timeout",
+      ].includes(flag)
+    ) {
       const value = args[index + 1];
       if (value === undefined) throw new Error(`${flag} requires a value.`);
       if (flag === "--timeout") {
         parsed.timeoutMs = Number(value);
       } else {
-        parsed[flag.slice(2)] =
-          flag === "--cwd" ? resolve(defaultCwd, value) : value;
+        const key = {
+          "--context-mode": "contextMode",
+          "--source-transcript": "sourceTranscript",
+        }[flag] ?? flag.slice(2);
+        parsed[key] = flag === "--cwd" ? resolve(defaultCwd, value) : value;
       }
       index += 1;
       continue;
@@ -65,6 +87,9 @@ export function parseCliArgs(args, defaultCwd = process.cwd()) {
     throw new Error("--to must be claude or codex.");
   }
   if (!parsed.request) throw new Error("--request is required.");
+  if (parsed.contextMode && !CONTEXT_MODES.includes(parsed.contextMode)) {
+    throw new Error(`--context-mode must be one of: ${CONTEXT_MODES.join(", ")}.`);
+  }
   if (!Number.isFinite(parsed.timeoutMs) || parsed.timeoutMs <= 0) {
     throw new Error("--timeout must be a positive number of milliseconds.");
   }

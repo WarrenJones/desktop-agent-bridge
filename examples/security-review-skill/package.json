@@ -1,0 +1,10 @@
+{
+  "name": "example-dab-security-review-skill",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Example cross-host skill package built on desktop-agent-bridge.",
+  "type": "module",
+  "peerDependencies": {
+    "desktop-agent-bridge": ">=0.2.0"
+  }
+}
