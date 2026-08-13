@@ -1,6 +1,6 @@
 {
   "name": "desktop-agent-bridge",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Local-first handoffs between native Codex Desktop and Claude Desktop sessions.",
   "keywords": [
     "codex",
@@ -50,6 +50,7 @@
     "examples/",
     "docs/",
     "README.md",
+    "README.zh-CN.md",
     "LICENSE"
   ]
 }

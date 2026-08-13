@@ -26,6 +26,7 @@
 | 产品 | 实际运行表面 | Context 的实际处理 | 能否满足原生 Desktop 双向闭环 |
 | --- | --- | --- | --- |
 | OpenAI `codex-plugin-cc` | Claude Code → 本地 Codex runtime / Codex 持久线程 | review 读取 Git 状态；rescue 转发任务文本；transfer 以 Claude transcript JSONL 为输入导入 Codex 线程 | 不能。它非常接近 Claude Code → Codex，但源头不是 Claude Desktop，也没有 Codex Desktop → Claude Desktop 的对称路径 |
+| `agent-bridge` | Claude Code ↔ Codex CLI/TUI 持久 peer | daemon 维护连接；Claude 侧经 MCP、Codex 侧经 app-server 交换消息并保持 peer 关系 | 不能。它已经解决真正双向的 Agent bridge，但运行表面是 CLI/TUI，不是两个原生 Desktop 应用 |
 | `hcom` | 被 `hcom` 启动或接管的多个 CLI Agent | 消息经 hooks 和本地 SQLite 投递；Agent 可查询 inbox、结构化 transcript、文件编辑和事件日志 | 不能。解决的是终端 Agent 通信与编排，不创建两个厂商的原生 Desktop 会话 |
 | `agentchattr` | CLI wrapper + 本地聊天服务 + MCP | 被 @ 的 Agent 读取频道近期消息；job 会携带标题、状态和该 job 的会话历史 | 不能。Context 来自共享聊天室或 job，不是源 Desktop 的私有会话上下文 |
 | `agent-talk` | 独立 CLI Agent + `retalk` 消息通道 | 传递显式消息；项目明确不提供共享任务列表、lead 或自动汇总 | 不能。它提供通信原语，不负责原生 Desktop session 创建和 review 结果闭环 |
@@ -49,6 +50,10 @@
 [`hcom` README](https://github.com/aannoo/hcom#how-it-works) 说明消息通过 hooks 写入本地 SQLite，再注入另一个 Agent；每个 Agent 暴露可查询的 inbox、terminal screen、结构化 transcript 和事件日志。README 也宣称支持 handoff 的 bundled context。
 
 但公开说明没有证明“每次 handoff 都自动复制发送方完整模型上下文”。能确认的是：它保存并暴露消息、transcript 和事件，让 Agent 在需要时查询；运行对象仍然是 CLI/terminal Agent。
+
+#### `agent-bridge`
+
+[`agent-bridge` README](https://github.com/raysonmeng/agent-bridge#architecture) 描述了一个真正双向、持久的 Claude Code ↔ Codex peer：`abg claude` 和 `abg codex` 启动终端 Agent，daemon 负责路由，Claude 通过 MCP、Codex 通过 app-server 交换消息。它证明“双向 bridge”本身不是 DAB 独有价值；DAB 要补的是不同边界——用户正在使用的两个原生 Desktop session、可见目标 session、源 transcript 与结果返回。
 
 #### `agentchattr`
 

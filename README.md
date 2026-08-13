@@ -1,136 +1,134 @@
-# desktop-agent-bridge
+# Desktop Agent Bridge
 
-Local-first, native Desktop handoffs between Codex and Claude.
+[![npm version](https://img.shields.io/npm/v/desktop-agent-bridge.svg)](https://www.npmjs.com/package/desktop-agent-bridge)
+[![macOS](https://img.shields.io/badge/platform-macOS-black.svg)](#install-and-use)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-The package provides a read-only handoff engine in both directions. The bundled `peer-review` Skill is the first workflow: it gives the other agent access to the source session context, creates a native Desktop session/thread, and returns the final result to the source conversation. Third-party Skills can build other workflows on the same CLI or Node API.
+**Let the agent in your current native Desktop conversation ask another native Desktop agent for help—with session context—and bring the answer back.**
 
-For component boundaries, bidirectional lifecycle diagrams, trust guarantees, failure semantics, and adapter maintenance guidance, see the [core architecture](docs/architecture.md). For the market evidence behind the product, the Context model, and the pluggable Skill boundary, see [why DAB exists](docs/research-and-rationale.md).
-
-## What works today
-
-### Codex Desktop → Claude Desktop
-
-`dab` locates the current Codex rollout through `CODEX_THREAD_ID`, writes a normalized full transcript under DAB's user-level state directory, and points a new Claude Desktop Code session at that artifact. It switches the session to Manual permission mode, waits for a real text `end_turn`, and returns the exact final response plus the Claude session ID.
-
-### Claude Desktop → Codex Desktop
-
-The Claude plugin captures the exact current JSONL path in a `SessionStart` hook. In `auto` mode, DAB asks Codex's external-agent importer to convert that Claude history into a persistent Codex thread, then resumes it with the workflow request under a read-only sandbox. If the installed Codex runtime does not support import, DAB falls back to a normalized full-transcript artifact and a new persistent thread.
-
-If the deep link cannot be opened, the completed review is still returned and the JSON result includes `handoffError`.
-
-## Requirements
-
-- macOS
-- Node.js 20 or newer
-- Claude Desktop with the target project already visible in the Code sidebar
-- Codex Desktop / ChatGPT app
-- macOS Accessibility permission for the terminal or host app that runs `dab`
-
-## Install
-
-Install the public npm package globally, then install the Codex user Skill and Claude user Plugin:
+[中文说明](README.zh-CN.md) · [Architecture](docs/architecture.md) · [Research and rationale](docs/research-and-rationale.md) · [Skill authoring](docs/skill-packages.md)
 
 ```bash
 npm install -g desktop-agent-bridge
 dab install
 ```
 
-Restart Codex Desktop and Claude Desktop after `dab install` completes.
+## 1. What it is
 
-To upgrade:
-
-```bash
-npm install -g desktop-agent-bridge@latest
-dab install
-```
-
-### Install from source
-
-For contributors and local development:
-
-```bash
-git clone https://github.com/WarrenJones/desktop-agent-bridge.git
-cd desktop-agent-bridge
-node scripts/install.js
-```
-
-This installs:
-
-- `~/.local/bin/dab`
-- `~/.agents/skills/peer-review/SKILL.md` for Codex
-- `desktop-agent-bridge@desktop-agent-bridge` through Claude's native user-scope Plugin marketplace
-
-The Claude Plugin contains the `peer-review` Skill and the `SessionStart` transcript hook. During plugin development it can also be loaded directly with:
-
-```bash
-claude --plugin-dir ./integrations/claude-plugin
-```
-
-## Use from Desktop
-
-From a Codex Desktop project task:
+Desktop Agent Bridge (DAB) connects **Codex Desktop and Claude Desktop in both directions**. The source agent remains the user's working conversation; DAB transfers the task and relevant source-session history, opens a new visible session in the other native Desktop app, waits for the result, and returns that result to the source agent.
 
 ```text
-$peer-review Ask Claude to review the current changes for correctness and regressions.
+current Desktop conversation
+        │ task + source-session context
+        ▼
+Desktop Agent Bridge ──► new native Desktop review session
+        ▲                            │
+        └──────── final result ──────┘
 ```
 
-From a Claude Desktop Code session:
+The first bundled workflow is `peer-review`:
+
+- In Codex Desktop: `$peer-review Ask Claude to review the current changes.`
+- In Claude Desktop: `/peer-review Ask Codex to review the current changes.`
+- Both reviewers inspect the same current working tree without modifying it; Codex uses a read-only sandbox, while Claude uses Manual approval mode.
+- The transport engine is generic; independent Skills can build security review, architecture challenge, test-plan review, or other handoffs.
+
+### Two real native Desktop handoffs
+
+These recordings use the public [`demo-review-project`](examples/demo-review-project). The critical product decision exists **only in the source conversation**, not in the repository or the review request. Each target agent still finds the intended defect, demonstrating that source-session context crossed the bridge. The recordings contain only the demo conversation area—no private sidebars, unrelated tasks, account details, notifications, or local paths.
+
+| Codex Desktop → Claude Desktop | Claude Desktop → Codex Desktop |
+| --- | --- |
+| Codex knows that membership credit must never pay shipping. DAB creates a Claude Desktop session; Claude finds that `checkoutTotal` incorrectly discounts shipping; the findings return to Codex. | Claude knows that a token expires at the exact `expiresAt` instant. DAB creates a Codex Desktop task; Codex finds the `>` versus `>=` boundary bug; the findings return to Claude. |
+| [![Watch Codex to Claude review](https://raw.githubusercontent.com/WarrenJones/desktop-agent-bridge/main/docs/assets/demos/codex-to-claude.gif)](https://github.com/WarrenJones/desktop-agent-bridge/blob/main/docs/assets/demos/codex-to-claude.mp4) | [![Watch Claude to Codex review](https://raw.githubusercontent.com/WarrenJones/desktop-agent-bridge/main/docs/assets/demos/claude-to-codex.gif)](https://github.com/WarrenJones/desktop-agent-bridge/blob/main/docs/assets/demos/claude-to-codex.mp4) |
+
+The sessions in these videos are real and recoverable in the native apps; the three stages are cut together only to keep each walkthrough short.
+
+## 2. Why it needs to exist
+
+Agent-to-agent delegation already exists, but the representative tools we reviewed solve a different boundary:
+
+| Project | Where agents run | Context / collaboration model | Native Codex Desktop ↔ Claude Desktop? |
+| --- | --- | --- | --- |
+| [OpenAI `codex-plugin-cc`](https://github.com/openai/codex-plugin-cc) | Claude Code → Codex runtime / persistent Codex thread | Git-based review, explicit delegation, and Claude transcript import for transfer | No. It starts from Claude Code and is not symmetric. |
+| [`agent-bridge`](https://github.com/raysonmeng/agent-bridge) | Claude Code and Codex CLI/TUI | Persistent bidirectional peers through a daemon, MCP, and app-server | No. Its peers are terminal agents. |
+| [`hcom`](https://github.com/aannoo/hcom) | Multiple CLI agents launched or attached in terminals | Hooks, messages, transcripts, events, and local SQLite | No. It coordinates terminal agents. |
+| [VS Code Agent Sessions](https://code.visualstudio.com/docs/agents/run/sessions/manage-sessions) | Multiple sessions owned by one VS Code host | The host can fork history, read recent context, and message sessions | No. Both sessions must live inside the shared VS Code host. |
+| **Desktop Agent Bridge** | **Native Codex Desktop and native Claude Desktop** | **Source transcript + live working tree → visible target session → result returned** | **Yes, this is its narrow purpose.** |
+
+The gap is not “agents cannot talk.” It is this exact workflow:
+
+1. keep working in the first-party Desktop app you already use;
+2. ask the other vendor's Desktop agent for an independent opinion;
+3. let that agent see the decisions already made in the source conversation;
+4. keep the new target session visible and resumable;
+5. receive the conclusion without copying and pasting between windows.
+
+DAB deliberately does not replace either agent UI, build a shared chat room, or become a multi-agent scheduler. It is a small interoperability layer at the native Desktop session boundary. The evidence and narrower product conclusion are documented in [research and rationale](docs/research-and-rationale.md).
+
+## 3. How context crosses agents
+
+“Share the context” does not mean blindly paste every JSONL byte into one prompt. DAB treats the source transcript as auditable history and the repository as current truth.
+
+![DAB handoff lifecycle](docs/assets/handoff-lifecycle.svg)
+
+### Claude Desktop → Codex Desktop
+
+1. The Claude Plugin's `SessionStart` hook records the exact current transcript path.
+2. In `auto` mode, DAB passes that JSONL to Codex's external-agent importer.
+3. Codex converts it into a persistent native thread, then resumes the thread with the bounded review request under a read-only sandbox.
+4. DAB returns the final Codex response and opens the native thread through a `codex://` deep link.
+
+This is native history import, following Codex's importer conversion rules—not a claim that Claude's hidden model state is copied.
+
+### Codex Desktop → Claude Desktop
+
+1. DAB locates the current Codex rollout using `CODEX_THREAD_ID`.
+2. It creates a user-level normalized transcript artifact containing user/assistant messages and bounded notes for relevant tool activity.
+3. It excludes source-host system/developer control, hidden reasoning, metadata, and sidechains.
+4. A new Claude Desktop Code session receives the artifact plus the review task and reads the current repository directly.
+5. DAB waits for a real text `end_turn` and returns Claude's final response and session ID.
+
+Claude Desktop does not expose a public cross-vendor transcript importer, so this direction provides a transcript artifact to a new native session; it does not pretend to rewrite Claude's visible chat history.
+
+### Context modes
+
+| Mode | What the target receives |
+| --- | --- |
+| `auto` | Native import when available; otherwise a normalized full transcript. Bundled Skills use this mode. |
+| `full` | Always use a normalized full transcript artifact. |
+| `raw` | The exact source JSONL path plus its SHA-256 hash. |
+| `bounded` | Only explicit `--context`; useful when transcript content must not cross providers. |
+
+The source JSONL is never modified. `auto`, `full`, and `raw` may expose text previously produced by users, agents, or tools to the destination model provider; use `bounded` for sensitive cross-provider boundaries. See [architecture](docs/architecture.md) for trust boundaries and failure semantics.
+
+## 4. How to extend it with your own Skill
+
+DAB separates **workflow semantics** from **Desktop transport**:
 
 ```text
-/peer-review Ask Codex to review the current changes against the intended design.
+your Skill or Plugin
+  └─ decides when to run, what B should do, and the result contract
+       └─ dab handoff / Node API
+            └─ context, native session creation, waiting, and result return
 ```
 
-Natural-language requests such as “ask Claude/Codex to independently review the current changes” also activate the installed skill when the Desktop agent recognizes it.
+A third-party Skill can live in its own GitHub repository, npm package, Claude Plugin, or user-scope Agent Skill. It does not need to add files to the business repository, and DAB does not require a proprietary Skill registry.
 
-## CLI
+The minimum CLI contract is:
 
 ```bash
 dab handoff \
   --to claude \
   --cwd "$PWD" \
-  --request "Review the current uncommitted changes" \
-  --workflow peer-review \
+  --request "Review authentication boundaries" \
+  --workflow security-review \
+  --instructions "Return severity, file:line, impact, and evidence" \
   --context-mode auto \
   --json
 ```
 
-```bash
-dab handoff \
-  --to codex \
-  --cwd "$PWD" \
-  --request "Review the current uncommitted changes" \
-  --workflow peer-review \
-  --context-mode auto \
-  --json
-```
-
-`dab review` remains a backwards-compatible alias. Context modes are:
-
-| Mode | Behavior |
-| --- | --- |
-| `bounded` | Only `--context` is sent. This is the default for direct CLI compatibility. |
-| `auto` | Native import for Claude → Codex; otherwise a normalized full transcript. Bundled Skills use this mode. |
-| `full` | Always produce a normalized full transcript artifact. |
-| `raw` | Give the target the exact source JSONL path and SHA-256. |
-
-The normalized transcript keeps user/assistant text, converts relevant Claude tool activity to bounded notes, and excludes source-host control messages, hidden reasoning, meta records, and sidechains. The source JSONL is never modified.
-
-## Build a pluggable Skill
-
-A third-party Skill owns workflow semantics and calls DAB for transport. It can live in its own GitHub repository, npm package, Claude Plugin, or user-scope Agent Skill; it does not need files in the business repository.
-
-```bash
-dab handoff \
-  --to <claude-or-codex> \
-  --cwd "$PWD" \
-  --request "<workflow task>" \
-  --workflow <workflow-name> \
-  --instructions "<result contract>" \
-  --context-mode auto \
-  --json
-```
-
-Node-based packages can instead import `handoff`:
+Node packages can use the same engine directly:
 
 ```js
 import { handoff } from "desktop-agent-bridge";
@@ -144,40 +142,82 @@ const result = await handoff({
 });
 ```
 
-See the [Skill package authoring guide](docs/skill-packages.md) and the [security-review example](examples/security-review-skill).
+A minimal cross-host package looks like this:
 
-## Safety boundary
+```text
+my-review-skill/
+├── .claude-plugin/plugin.json
+├── integrations/claude-plugin/skills/my-review/SKILL.md
+└── integrations/codex-skill/my-review/SKILL.md
+```
 
-- Codex uses `--sandbox read-only`.
-- Claude Desktop is switched to Manual permission mode before submission, so file changes require explicit user approval. Do not approve changes during a review. Unlike the Codex adapter, this is not an OS-level read-only sandbox.
-- The prompt also prohibits modifications, branch changes, commits, pushes, deployments, and destructive commands.
-- Source-agent context is marked as untrusted historical data and cannot override the review constraints.
-- `auto`, `full`, and `raw` can expose transcript content—including content previously returned by tools—to the destination model provider. Use `bounded` when the source transcript contains data that must not cross providers.
-- Review requests use the existing local login state of each Desktop application. The bridge stores no credentials.
+Both Skills call the installed `dab` executable and own only the workflow instructions. Start with the [Skill package authoring guide](docs/skill-packages.md) and the working [security-review example](examples/security-review-skill).
 
-Claude Desktop does not currently expose a stable public session-creation automation API. The Claude adapter therefore uses semantic macOS Accessibility elements, isolated in `scripts/claude-desktop.jxa`. A Desktop UI update may require updating only this adapter.
+## Install and use
 
-Claude Desktop identifies projects by the directory name in its current sidebar. If two open projects have the same final directory name, keep only the intended project open while starting a review.
+### Requirements
 
-## Verification
+- macOS
+- Node.js 20 or newer
+- Claude Desktop with the target project already visible in the Code sidebar
+- Codex Desktop / ChatGPT app
+- macOS Accessibility permission for the terminal or host app that runs `dab`
+
+### Install from npm
+
+```bash
+npm install -g desktop-agent-bridge
+dab install
+```
+
+Restart both Desktop apps after installation. `dab install` adds:
+
+- `~/.local/bin/dab`
+- the Codex user Skill at `~/.agents/skills/peer-review/SKILL.md`
+- the Claude user Plugin, including the `peer-review` Skill and transcript hook
+
+Then, from a project conversation:
+
+```text
+# Codex Desktop
+$peer-review Ask Claude to review the current changes for correctness and regressions.
+
+# Claude Desktop
+/peer-review Ask Codex to review the current changes against the intended design.
+```
+
+To upgrade:
+
+```bash
+npm install -g desktop-agent-bridge@latest
+dab install
+```
+
+For contributors:
+
+```bash
+git clone https://github.com/WarrenJones/desktop-agent-bridge.git
+cd desktop-agent-bridge
+node scripts/install.js
+npm test
+```
+
+## Safety, compatibility, and scope
+
+- Codex reviews run with `--sandbox read-only`.
+- Claude Desktop is switched to Manual permission mode before submission. This creates an approval boundary, but it is not an OS-level read-only sandbox; do not approve modifications during a review.
+- Prompts also prohibit file changes, Git mutation, deployment, and destructive commands.
+- Existing local Desktop login state is reused; DAB stores no credentials.
+- Claude Desktop currently lacks a stable public session-creation API. Its semantic Accessibility adapter is isolated in [`scripts/claude-desktop.jxa`](scripts/claude-desktop.jxa), so a UI compatibility update is normally contained there.
+- The MVP does not include real-time agent chat, a multi-agent scheduler, arbitrary attachment to an existing target session, code modification, deployment, or a separate `doctor` command.
+
+Run the verification suite with:
 
 ```bash
 npm test
 npm run check
 ```
 
-The repository includes transcript fixtures for split `thinking`/`text` events, tool-result marker echoes, and sidechain isolation because these are real Claude Desktop transcript shapes.
+## License and prior art
 
-## Scope
-
-The MVP intentionally does not include:
-
-- a multi-agent scheduler
-- real-time agent-to-agent chat
-- arbitrary attachment to an already-running target session
-- code modification, Git mutation, or deployment
-- a separate `doctor` command
-
-## Prior art
-
-This implementation is informed by OpenAI's `codex-plugin-cc` and AgentBridge. It uses independent code and public process/protocol behavior; it does not copy their source.
+MIT. The implementation is independent code informed by public behavior and documentation from projects such as OpenAI's `codex-plugin-cc`, `agent-bridge`, and `hcom`; it does not copy their source.
